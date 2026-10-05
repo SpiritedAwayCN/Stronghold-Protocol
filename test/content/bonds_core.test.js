@@ -336,6 +336,71 @@ test('阿戈尔: HP ×(1.35+0.01L); devour chain (left first): 5000 物理流失
   checkInvariants(h.b);
 });
 
+test('阿戈尔 devour: final additive ATK ignores atkPct but benefits from atkMul, uses target base ATK, and persists after redeploy', () => {
+  const list = [
+    ['g1_a', ['egirShip']], ['g2_a', ['egirShip']], ['g3_a', ['egirShip']],
+    ['fod_a', [], { stats: { atk: 700, maxHp: 20000 } }],
+  ];
+  const h = makeBattle({
+    defs: defsOf(list), bonds: { egirShip: bondOn(3, 0, null, [3, 5]) },
+    units: [
+      { chessId: 'g1_a', row: 10, col: 3 }, { chessId: 'g2_a', row: 10, col: 4 },
+      { chessId: 'fod_a', row: 10, col: 5 }, { chessId: 'g3_a', row: 12, col: 3 },
+    ],
+    setup: (battle) => battle.on('battleStart', () => {
+      for (const unit of battle.allyUnits) {
+        battle.addBuff(unit, { key: 'test:atk', persist: true, mods: { atkFlat: 200, atkPct: 1, atkMul: 1.5 } });
+      }
+    }, { priority: 100 }),
+  });
+  h.step(1);
+  const marker = h.unit('g1_a');
+  assert.equal(buffOf(marker, 'bond:egir:devour').mods.atkFinalFlat, 1700);
+  assert.equal(buffOf(marker, 'bond:egir:devour').mods.atkFlat, undefined);
+  close(marker.s.atk, ((1000 + 200) * 2 + 1700) * 1.5);
+  close(h.unit('g2_a').s.atk, ((1000 + 200) * 2 + 700) * 1.5);
+  close(h.unit('g3_a').s.atk, (1000 + 200) * 2 * 1.5, 1e-6, 'no devour gain on an empty front tile');
+  h.b.removeBuff(marker, 'test:atk');
+  close(marker.s.atk, 2700, 1e-6, 'removing ATK bonuses leaves the same final devour gain');
+  h.b.addBuff(marker, { key: 'test:atk', mods: { atkPct: -1, atkMul: 2 } });
+  close(marker.s.atk, 1700 * 2, 1e-6, 'devour gain still benefits from atkMul when the percentage component is zero');
+  h.b.dealDamage(null, marker, { amount: 1e9, type: 'true' });
+  assert.ok(!marker.alive);
+  assert.ok(h.b.redeploy(marker, { free: true }));
+  close(marker.s.atk, 2700, 1e-6, 'the final additive gain survives redeploy');
+  checkInvariants(h.b);
+});
+
+test('阿戈尔 devour + Skadi S3: the skill ATK bonus scales only her own base ATK, not devoured ATK', () => {
+  const skadiId = 'chess_char_3_05_a';
+  const source = getDefaultSource();
+  const defs = defsOf([
+    ['g1_a', ['egirShip']], ['g2_a', ['egirShip']],
+    ['fod_a', [], { stats: { atk: 700, maxHp: 30000 } }],
+  ]);
+  defs.chess[skadiId] = { ...source.rawChess(skadiId), garrisonIds: [] };
+  const h = makeBattle({
+    defs, bonds: { egirShip: bondOn(3, 0, null, [3, 5]) },
+    units: [
+      { chessId: skadiId, row: 10, col: 3 }, { chessId: 'fod_a', row: 10, col: 4 },
+      { chessId: 'g1_a', row: 12, col: 3 }, { chessId: 'g2_a', row: 12, col: 5 },
+    ],
+    enemies: [{ key: 'e_dummy', pos: [10, 3] }],
+  });
+  h.step(1);
+  const skadi = h.unit(skadiId);
+  const talentPct = buffOf(skadi, 'talent:skadi_predator').mods.atkPct;
+  const skillPct = source.getChess(skadiId).skill.bb.atk;
+  h.b.addBuff(skadi, { key: 'test:atkMul', mods: { atkMul: 1.5 } });
+  const before = skadi.s.atk;
+  close(before, (skadi.base.atk * (1 + talentPct) + 700) * 1.5);
+  skadi.skill.gainSp(1000, 'test');
+  assert.ok(h.runUntil(() => skadi.skill.active, 10));
+  close(skadi.s.atk, (skadi.base.atk * (1 + talentPct + skillPct) + 700) * 1.5);
+  close(skadi.s.atk - before, skadi.base.atk * skillPct * 1.5, 1e-6, 'the skill adds no percentage of the devoured 700 ATK');
+  checkInvariants(h.b);
+});
+
 test('阿戈尔 devour: 物理流失 ignores the marker’s damage bonuses and the target’s shields; a dead marker still resolves its marks; kill → marker', () => {
   const list = [
     ['g1_a', ['egirShip', 'kjeragShip']], ['g2_a', ['egirShip'], { stats: { maxHp: 3000 } }], ['g3_a', ['egirShip']],

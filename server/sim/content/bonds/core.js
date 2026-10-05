@@ -351,7 +351,7 @@ function egirDownAtStart(battle, u) {
  * the operator on the tile in front of them (one step along each member's own direction `dir`), and through marked
  * members the tiles in front of
  * those (chain); never themselves, a unit already marked by them or a unit that marked them. The marker gains the base
- * ATK (atkFlat) and block count of everything it marked; then each mark makes its target lose damage_value HP as a
+ * ATK (atkFinalFlat) and block count of everything it marked; then each mark makes its target lose damage_value HP as a
  * 物理流失 (PRTS 盟约记录: "造成5000点物理流失", 修正 "【吞噬】的物理流失来源为被付与目标自身；单位被【吞噬】击杀时，击杀来源始终为
  * 对应标记的付与来源"; PRTS 作战机制: a 物理流失 "会受到目标当前防御力…影响而相应衰减") — less the target's DEF as a physical hit
  * (its own source: no DEF ignore), then battle.loseHp: no shields, dodge or damage multipliers (DEF-free until 0.1.1); the
@@ -400,7 +400,7 @@ function devour(battle, pid, bb, members) {
     let atk = 0, block = 0;
     for (const t of mine) { atk += num(t.base.atk, 0); block += num(t.base.blockCnt, 0); marks.push([m, t]); }
     const mods = {};
-    if (atk > 0) mods.atkFlat = atk;
+    if (atk > 0) mods.atkFinalFlat = atk;
     if (block > 0) mods.blockCnt = block;
     if (Object.keys(mods).length) S.passiveBuff(battle, m, 'bond:egir:devour', mods);
   }

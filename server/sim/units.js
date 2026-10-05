@@ -1,7 +1,8 @@
 // server/sim/units.js — Unit model (operators, tokens, enemies, devices) and stat aggregation (DESIGN §5.2).
 //
 // Aggregation (recomputed lazily whenever buffs change — `unit.markDirty()`):
-//   ATK/DEF/maxHp = (base + Σflat) × (1 + Σpct) × Πmul
+//   ATK           = ((base + Σflat) × (1 + Σpct) + ΣfinalFlat) × Πmul
+//   DEF/maxHp     = (base + Σflat) × (1 + Σpct) × Πmul
 //   res           = clamp((base + Σflat) × Πmul, 0, 100)
 //   aspd          = clamp(base + Σaspd, 20, 600)          (base is 100 for almost everyone; floor 20 = PRTS 数值范围)
 //   interval      = bat × (1 + ΣbatPct) × 100 / aspd      (ΣbatPct floored at −0.9)
@@ -118,7 +119,7 @@ export class Unit {
     const b = this.base;
     const bHp = fin(b.maxHp, 1) > 0 ? fin(b.maxHp, 1) : 1;
     const maxHp = Math.max(1, fin((bHp + a('hpFlat')) * Math.max(0, 1 + a('hpPct')) * m('hpMul'), bHp));
-    const atk = Math.max(0, fin((b.atk + a('atkFlat')) * Math.max(0, 1 + a('atkPct')) * m('atkMul'), fin(b.atk, 0)));
+    const atk = Math.max(0, fin(((b.atk + a('atkFlat')) * Math.max(0, 1 + a('atkPct')) + a('atkFinalFlat')) * m('atkMul'), fin(b.atk, 0)));
     const def = Math.max(0, fin((b.def + a('defFlat')) * Math.max(0, 1 + a('defPct')) * m('defMul'), fin(b.def, 0)));
     const res = clamp(fin((b.res + a('resFlat')) * m('resMul'), fin(b.res, 0)), 0, 100);
     const aspd = clamp(fin(b.aspd + a('aspd'), 100), ASPD_MIN, ASPD_MAX);

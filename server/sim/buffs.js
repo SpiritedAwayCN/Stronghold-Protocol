@@ -18,7 +18,7 @@ function resistPalsyDecay({ battle, unit }) {
 
 /** Additive mod keys (summed; × stacks). */
 export const ADD_KEYS = Object.freeze([
-  'atkFlat', 'atkPct', 'defFlat', 'defPct', 'hpFlat', 'hpPct', 'resFlat', 'aspd', 'batPct', 'blockCnt',
+  'atkFlat', 'atkPct', 'atkFinalFlat', 'defFlat', 'defPct', 'hpFlat', 'hpPct', 'resFlat', 'aspd', 'batPct', 'blockCnt',
   'rangeExtend', 'defIgnoreFlat', 'defIgnorePct', 'resIgnoreFlat', 'resIgnorePct', 'dodgePhys', 'dodgeArts',
   'spRecoveryFlat', 'maxTargets', 'taunt', 'hpRegen', 'hpRegenRatio', 'spCostFlat', 'moveFlat', 'massFlat',
 ]);

@@ -118,15 +118,15 @@ test('dodge uses the seeded rng and is deterministic', () => {
   assert.ok(a > 150 && a < 250, `~50% hits (${a})`);
 });
 
-test('stat aggregation: (base+flat)(1+pct)Πmul, res clamp, aspd clamp, interval, HP ratio kept', () => {
+test('stat aggregation: ((base+flat)(1+pct) + final flat)Πmul, res clamp, aspd clamp, interval, HP ratio kept', () => {
   const u = new Unit({ id: 1, side: 'ally', kind: 'op', base: { maxHp: 1000, atk: 100, def: 50, res: 20, aspd: 100, bat: 1.2 } });
   u.alive = true;
   u.hp = 500;
-  u.buffs.push({ key: 'a', stacks: 1, mods: { atkFlat: 50, atkPct: 0.5, atkMul: 1.2, hpPct: 1, resFlat: 200, aspd: 30, batPct: -0.25 } });
-  u.buffs.push({ key: 'b', stacks: 2, mods: { atkPct: 0.1, atkMul: 1.1 } });
+  u.buffs.push({ key: 'a', stacks: 1, mods: { atkFlat: 50, atkPct: 0.5, atkMul: 1.2, atkFinalFlat: 25, hpPct: 1, resFlat: 200, aspd: 30, batPct: -0.25 } });
+  u.buffs.push({ key: 'b', stacks: 2, mods: { atkPct: 0.1, atkMul: 1.1, atkFinalFlat: 10 } });
   u.markDirty();
   const s = u.s;
-  approx(s.atk, (100 + 50) * (1 + 0.5 + 0.2) * 1.2 * 1.1 * 1.1);
+  approx(s.atk, ((100 + 50) * (1 + 0.5 + 0.2) + 25 + 2 * 10) * 1.2 * 1.1 * 1.1);
   assert.equal(s.res, 100);
   assert.equal(s.aspd, 130);
   approx(s.interval, 1.2 * 0.75 * 100 / 130);
