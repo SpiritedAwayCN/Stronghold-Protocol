@@ -504,17 +504,21 @@ export function reduceElement(target, amount, el = null) {
   return removed;
 }
 
+/** Eligibility shared by HP healing and its accompanying elemental recovery. */
+export function canReceiveHealing(source, target, opts = {}) {
+  if (!target || !target.alive || target.removed || !target.deployed || target.bossPool) return false;
+  const self = source === target || !!opts.self;
+  if (!self && (target.s.flags.noHeal || (target.profile && target.profile.noHeal))) return false;
+  return !target.s.flags.healFree || !!opts.ignoreHealFree;
+}
+
 /**
- * Heal pipeline. Returns the HP actually restored. `noHeal` stops heals from others (`self` heals pass); `healFree` (禁疗,
- * PRTS 异常效果 HEAL_FREE "受到的治疗量变为0") stops the unit's own too — except an HP-regeneration attribute (`regen`:
- * "增减生命回复速度或生命回复速度（百分比）属性的效果不会被识别为治疗类能力") and a heal that ignores it (`ignoreHealFree`:
- * 史尔特尔 S3's start heal, PRTS "无视禁疗").
+ * Direct healing: noHeal rejects other units, healFree also rejects self-heals unless ignoreHealFree.
+ * Legacy opts.regen is routed to the separate HP-regeneration channel.
  */
 export function heal(battle, source, target, amount, opts = {}) {
-  if (!target || !target.alive || target.removed || !target.deployed || target.bossPool) return 0;
-  const self = source === target || !!opts.self;
-  if (!self && (target.s.flags.noHeal || (target.profile && target.profile.noHeal))) return 0;
-  if (target.s.flags.healFree && !opts.regen && !opts.ignoreHealFree) return 0;
+  if (opts.regen) return regenerateHp(battle, source, target, amount, opts);
+  if (!canReceiveHealing(source, target, opts)) return 0;
   let amt = amount * (source && source.s ? source.s.healingDealtMul : 1) * target.s.healingTakenMul;
   if (!(amt > 0) || !Number.isFinite(amt)) return 0;
   if (battle._hooks.heal) {
@@ -524,6 +528,25 @@ export function heal(battle, source, target, amount, opts = {}) {
     // a handler may have killed / retreated the target: healing a dead unit would leave it "dead with hp > 0"
     if (!target.alive || !target.deployed) return 0;
   }
+  return restoreHp(battle, source, target, amt, opts);
+}
+
+/** HP-recovery attributes: no healing multipliers, heal hooks or heal prohibitions. */
+export function regenerateHp(battle, source, target, amount, opts = {}) {
+  if (!target || !target.alive || target.removed || !target.deployed || target.bossPool) return 0;
+  let amt = amount * target.s.hpRegenMul;
+  if (!(amt > 0) || !Number.isFinite(amt)) return 0;
+  const recoveryOpts = { ...opts, regen: true, overheal: false };
+  if (battle._hooks.hpRegen) {
+    const ctx = { source, target, amount: amt, opts: recoveryOpts };
+    battle.emit('hpRegen', ctx);
+    amt = Number.isFinite(ctx.amount) ? Math.max(0, ctx.amount) : 0;
+    if (!target.alive || target.removed || !target.deployed || target.bossPool) return 0;
+  }
+  return restoreHp(battle, source, target, amt, recoveryOpts);
+}
+
+function restoreHp(battle, source, target, amt, opts) {
   const max = target.s.maxHp;
   const actual = Math.max(0, Math.min(amt, max - target.hp));
   target.hp = Math.min(max, target.hp + actual);

@@ -154,6 +154,7 @@ export class Unit {
       elementalTakenMul: m('elementalTakenMul'), // 元素脆弱: 元素伤害 (the 'elemental' HP damage type)
       healingDealtMul: m('healingDealtMul'),
       healingTakenMul: m('healingTakenMul'),
+      hpRegenMul: m('hpRegenMul'),
       atkScaleMul: m('atkScaleMul'),
       spRecovery: Math.max(0, fin((b.spRecovery + a('spRecoveryFlat')) * m('spRecoveryMul'), 0)),
       spCostFlat: a('spCostFlat'),

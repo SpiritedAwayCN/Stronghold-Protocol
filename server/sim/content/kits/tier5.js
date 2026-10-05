@@ -1396,7 +1396,7 @@ const KITS = {
               battle.fx('mote', { x: hit.x, y: hit.y, id: hit.id });
             }
           });
-          battle.on('heal', (c) => {
+          battle.on('hpRegen', (c) => {
             if (c.source !== unit || !c.opts?.aura) return;
             const b = c.target.findBuff('cetsyr:mote');
             if (b) c.amount *= num(b.data.mul, 1);
@@ -1456,7 +1456,7 @@ const KITS = {
           if (unit.mem.foxHeal >= 1) {
             unit.mem.foxHeal -= 1;
             if (!(healRatio > 0)) return;
-            for (const a of battle.alliesInGrid(unit)) if (a.hp < a.s.maxHp) battle.heal(unit, a, unit.s.atk * healRatio, { aura: true });
+            for (const a of battle.alliesInGrid(unit)) if (a.hp < a.s.maxHp) battle.regenerateHp(unit, a, unit.s.atk * healRatio, { aura: true });
           }
         },
       },
@@ -1978,7 +1978,7 @@ const KITS = {
         if (z.acc >= 1 - 1e-9) {
           z.acc -= 1;
           const heal = unit.s.atk * num(bb.hp_recovery_per_sec_ratio);
-          if (heal > 0) for (const a of allies) if (a.hp < a.s.maxHp) battle.heal(unit, a, heal, { aura: true });
+          if (heal > 0) for (const a of allies) if (a.hp < a.s.maxHp) battle.regenerateHp(unit, a, heal, { aura: true });
         }
         return;
       }
@@ -2090,12 +2090,14 @@ const KITS = {
             z.y = Math.max(R.r0, Math.min(R.r1, z.y + z.vy * AURA_IV));
             const r = r0 + grow * z.t;
             const foes = battle.foesInRadius(z.x, z.y, r).filter((e) => !e.isFlying);
-            for (const e of foes) battle.addBuff(e, { key: 'thorn2:rot', duration: AURA_DUR, mods: { healingTakenMul: healMul } });
+            for (const e of foes) battle.addBuff(e, { key: 'thorn2:rot', duration: AURA_DUR, mods: { healingTakenMul: healMul, hpRegenMul: healMul } });
             if (z.acc >= 1 - 1e-9) {
               z.acc -= 1;
               for (const e of foes) battle.dealDamage(unit, e, { amount: unit.s.atk * num(bb.atk_scale), type: 'arts', isSkill: true, tags: ['skill', 'alchemy'] });
               const heal = unit.s.atk * num(bb.hp_recovery_per_sec_ratio_chr);
-              if (heal > 0) for (const a of battle.alliesInRadius(z.x, z.y, r, null)) if (a.hp < a.s.maxHp) battle.heal(unit, a, heal, { aura: true });
+              if (heal > 0) for (const a of battle.alliesInRadius(z.x, z.y, r, null)) {
+                if (a.hp < a.s.maxHp && battle.allySelectable(a, unit)) battle.regenerateHp(unit, a, heal, { aura: true });
+              }
               battle.fx('zone', { x: z.x, y: z.y, id: unit.id, r, duration: Math.max(0, z.dur - z.t) });
             }
           }
