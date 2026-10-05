@@ -475,7 +475,11 @@ rangeExtend, baseRangeExtend (its permanent part: persist + never-expiring buffs
 `unit.weight`), maxTargets (+n), taunt, dodgePhys, dodgeArts, defIgnoreFlat/Pct, resIgnoreFlat/Pct, dmgDealtMul,
 physDealtMul, artsDealtMul, dmgTakenMul, physTakenMul, artsTakenMul, trueTakenMul, elemTakenMul (元素损伤倍率: gauge fills),
 elementalTakenMul (元素脆弱: 元素伤害), healingDealtMul, healingTakenMul, atkScaleMul, spRecovery, spCostFlat, redeployMul,
-hpRegen, shield, flags{…}`.
+hpRegen, hpRegenMul, shield, flags{…}`.
+
+生命缓回速率：`s.hpRegen = base.hpRecoveryPerSec + ΣhpRegen + ΣhpRegenRatio × maxHp`。
+`s.hpRegenMul` 默认为 1，在生命回复通道结算时乘入一次；它不提前改写 `s.hpRegen`。
+普通治疗倍率不影响上述回复。
 
 Aggregation: `ATK/DEF/maxHp = (base + Σflat) × (1 + Σpct) × Πmul`; `res = clamp((base + ΣresFlat) × ΠresMul, 0, 100)`;
 `aspd = clamp(base + Σaspd, 20, 600)` (floor 20: PRTS 数值范围 ATTACK_SPEED 默认下限; user playtest #6); `interval = bat × (1 + ΣbatPct) × 100 / aspd`; `moveSpeed = (base + ΣmoveFlat) × ΠmoveMul`;
@@ -511,7 +515,7 @@ mods, flags, onTick(ctx), interval, onExpire(ctx), onRemove(ctx), tags, shield, 
 defIgnoreFlat defIgnorePct resIgnoreFlat resIgnorePct dodgePhys dodgeArts spRecoveryFlat maxTargets taunt hpRegen
 hpRegenRatio spCostFlat moveFlat massFlat` (重量 levels: 失重 = `massFlat: −1`; never edit `base.massLevel`);
 multiplicative: `atkMul defMul hpMul resMul moveMul dmgDealtMul dmgTakenMul physTakenMul artsTakenMul trueTakenMul
-elemTakenMul elementalTakenMul healingDealtMul healingTakenMul spRecoveryMul redeployMul atkScaleMul physDealtMul artsDealtMul`.
+elemTakenMul elementalTakenMul healingDealtMul healingTakenMul hpRegenMul spRecoveryMul redeployMul atkScaleMul physDealtMul artsDealtMul`.
 A `rangeExtend` on a `persist` never-expiring buff is **permanent**: it also widens the initial range (§7.1). It widens
 a running skill's range too, unless that skill's range ignores 攻击距离 (`targeting.noRangeExtend`; PRTS 数值范围 "根据配置
 不同，任何范围都可以受/不受该属性影响" — 信仰搅拌机 S3 "此技能的攻击范围不受“攻击距离”属性影响").
@@ -530,7 +534,7 @@ ability selects it — no heal, buff, aura or talent pick from another ally (`ba
 attribute such as 安洁莉娜's 兼职工作 still applies, PRTS 异常效果; no self-heal reaches those summons but 伺夜 S2's 恢复 of
 its 禁疗 狼群, which the skill text grants), flag `healFree` = 禁疗 that also stops the unit's own heals (`noHeal` stops
 only other units' heals and heal picks): 史尔特尔's 余烬 sets both, shown as the status 'healFree' — only an HP-regen
-attribute (`heal` opts `regen`) and a heal that "无视禁疗" (`ignoreHealFree`: her S3's start heal) reach her (PRTS 异常效果
+attribute（`regenerateHp` 通道；兼容 `heal` 的 `regen` 选项）and a heal that "无视禁疗" (`ignoreHealFree`: her S3's start heal) reach her (PRTS 异常效果
 HEAL_FREE "受到的治疗量变为0"; DESIGN §22.7), `stealthOff` = an enemy 隐匿 source switched off after a block
 (`stealthOff:<source buff key>`, below), `camou` = 迷彩 (below)). `taunt: true` as a flag counts
 as +1 taunt level (DESIGN §5.3).
@@ -670,11 +674,31 @@ draws nothing; research 11) → shields → HP loss
 (boss units: routed to `sharedBoss.damage(playerId, amount)`; a pool left under 1 HP is emptied) → if HP ≤ 0: **`fatal`** (`ctx.prevented = true` keeps the
 unit at ≥ 1 HP) → **`damaged`** → SP-on-hurt / TAKE_DAMAGE → `kill` + `death`.
 
-`battle.heal(source, target, amount, { overheal=false, self, silent, regen, ignoreHealFree })`: no-op on `noHeal` targets
-(unless self — 禁疗 / 孤立 summons carry the flag, §3) and on `healFree` ones, self included (史尔特尔's 余烬), unless `regen`
-(an HP-regen attribute tick) or `ignoreHealFree` (a heal that "无视禁疗");
-× source `healingDealtMul` × target `healingTakenMul`; **`heal`** hook (mutable amount); capped at max HP; `overheal`
-turns the excess into an `overheal` shield. `battle.loseHp(target, amount, { source, from, tags, silent, sourceless })` = HP
+### 治疗与生命缓回：两条独立通道
+
+- `battle.heal(source, target, amount, { overheal=false, self, silent, ignoreHealFree })`：
+  普通治疗。`noHeal` / `profile.noHeal` 拒绝其他单位的治疗；`healFree` 连自身治疗也拒绝，
+  只有明确声明 `ignoreHealFree` 的治疗可绕过后者。结算乘以来源 `healingDealtMul` 和目标
+  `healingTakenMul`，触发可修改回复量的 **`heal`** 钩子；可将过量治疗转为护盾。
+- `battle.regenerateHp(source, target, amount, opts)`：生命缓回。不检查上述禁疗标志，
+  不乘普通治疗倍率，也不触发 `heal` 钩子。仅乘目标 `hpRegenMul`，再触发可修改回复量的
+  **`hpRegen`** 钩子。钩子选项带 `regen: true`；不产生过量治疗护盾。
+- 两条通道共用内部 `restoreHp`，将生命值封顶于 `maxHp`，按实际回复量维护原有
+  `stats.heal` / `healingDone` 和客户端 `['heal', target.id, amount]` 事件。
+  死亡、退场、移除及共享首领血池目标不能获得缓回；缓回钩子改变目标存活状态后会重新检查。
+- 兼容旧调用：`battle.heal(..., { regen: true })` 直接转入生命缓回通道。
+  引擎的 `hpRegen` / `hpRegenRatio` 自然回复也使用新通道。
+- 通道只负责回复结算，不放宽目标选择。内容仍须使用原有效范围、阵营、职业条件与
+  `allySelectable` / `alliesFor`；不要用会过滤 `noHeal` 的 `injuredAlliesInKeys` 选择缓回目标。
+  「孤立」不是禁疗；余三技能按技能原规则保留孤立目标例外。
+- 魔王微尘移到 `hpRegen` 钩子；引星棘刺二技能同时设置 `healingTakenMul` 和 `hpRegenMul`，
+  保留「治疗与生命回复均削减」的语义。周期治疗不能仅因「每秒发生」就迁移为缓回。
+- `damage.js` 的 `canReceiveHealing(source, target, opts)` 共用普通治疗的存活、在场与禁疗判定。
+  「氤氲」每秒结算使用该判定：禁疗时不回复 HP 或元素损伤，增益仍按原时长计时；
+  解除禁疗后仍有效的增益继续回复。满 HP 不妨碍其元素损伤回复；自身治疗的 `noHeal` /
+  `healFree` 区别保持不变。一技能独立元素回复不使用此限制，仍按技能规则无视禁疗。
+
+`battle.loseHp(target, amount, { source, from, tags, silent, sourceless })` = HP
 loss ignoring DEF/RES/shields/dodge (流失); `sourceless: true` makes it 无来源 ("受到等量的无来源生命流失": hooks see no source,
 `source` keeps the credit — stats and the per-player shared-pool tally), as does a 无来源 `from`. A 流失 skips the damage
 events (PRTS 作战机制 "生命流失不会触发反伤、受击回复等受到攻击触发的时点"): no `hit`, no 受击回复 SP, no TAKE_DAMAGE; its
@@ -717,7 +741,8 @@ registration order. `battle.off(handle)` / `battle.off(name, fn)` / `battle.offO
 | `hit` | `{ source, target, dmg, credit }` | before mitigation; mutate `dmg` (not fired for gauge fills — see `elementHit`). `source` may be null (terrain; 无来源 `dmg.sourceless` bursts, whose `credit` names the unit credited) |
 | `elementHit` | `{ source, target, dmg }` | before a gauge fill (`dmg.type === 'element'`); mutate `dmg.amount`/`dmg.mul`, set `dmg.cancel` |
 | `damaged` | `{ source, target, amount, type, dmg, credit }` | after application (`amount` may be 0 when shielded); element fills too (with their source); 无来源: `source` null, `credit` set |
-| `heal` | `{ source, target, amount, opts }` | mutable `amount` |
+| `heal` | `{ source, target, amount, opts }` | 普通治疗；可修改 `amount`，不包含生命缓回 |
+| `hpRegen` | `{ source, target, amount, opts }` | 生命缓回；可修改 `amount`，`opts.regen` 为真，不触发普通治疗钩子 |
 | `fatal` | `{ unit, source, credit, dmg, amount, prevented }` | HP would reach 0 — set `prevented` (substitutes, kit savers, 不死 / 复活 items, 埃芒加德; 不屈 is a `death` hook). Fired by every HP loss of a unit without a boss pool — hits of any type, element bursts, 无来源 damage, `loseHp` 流失. Order: kits' own savers (10 … −60) → items' 不死 (坚固维式重锤 — once per deployment: `items/battle.js deploymentOf`, a key every deploy changes and an in-place 复活 changes too; one battle-level hook holds the running windows (`holdsUndying`), so a window outlasts a lend, DESIGN §21.21 — the lock `PRIO_REVIVE` −100 after the substitutes (−100, registered first), the running windows `PRIO_UNDYING_HELD` −99 before them: a 傀儡师 holding 不死 does not switch, PRTS 分支特性信息 傀儡师 "未持有不死的情况下", DESIGN §22.11) → items' 复活 (M3茧甲, `PRIO_RESPAWN` −101: PRTS "复活" acts on a knock-out, which a 不死 prevents) → 埃芒加德 (−110); both 复活 revive in place and call `revivedInPlace` (a new deployment for the lock) |
 | `dollSwitch` | `{ unit, reason, done }` | content switches a 傀儡师 to its <替身> now (归溟幽灵鲨 S2 "技能结束后立刻切换为<替身>": no lethal HP loss); its trait does it unless it already is one or is not on the field, and sets `done` |
 | `dollSwap` | `{ unit, form }` | a 傀儡师 starts a switch — to its <替身> (`form` `'doll'`) or back to its <本体> (`null`); not when it is knocked out as the 替身 (不屈 rolls on it: "切换<替身>与<本体>时") |
@@ -749,7 +774,7 @@ or guard with a per-unit flag while dealing it. When the guard trips, the logged
 
 | helper | notes |
 |---|---|
-| `dealDamage(src, tgt, dmg)`, `heal(src, tgt, amount, opts)`, `loseHp(tgt, amount, {source, from, tags, sourceless})` | §4 |
+| `dealDamage(src, tgt, dmg)`, `heal(src, tgt, amount, opts)`, `regenerateHp(src, tgt, amount, opts)`, `loseHp(tgt, amount, {source, from, tags, sourceless})` | §4；治疗与生命缓回分开结算 |
 | `applyStatus(tgt, key, {duration, source, value, force, point})`, `removeStatus(tgt, key)`, `resistOf(unit)` | §3 |
 | `applyStrongest(tgt, key, {duration, value, mods, source})` | §3 — "同名效果取最高" for a non-catalogue effect |
 | `addBuff(unit, buff)`, `removeBuff(unit, key)` | §3 |
@@ -1128,7 +1153,7 @@ table: `hitSleep` (targets and damages sleeping enemies — "可以攻击沉睡�
 | wandermedic | heal + reduce element gauges by 50 % ATK (bb ep_heal_ratio); also targets uninjured allies with gauge |
 | incantationmedic | arts attack; heals the lowest ally in range for 50 % (bb scale) of damage dealt |
 | slower | sluggish 0.8 s on hit (bb sluggish) |
-| bard | no attack; every second heals allies in range 10 % ATK (bb atk_to_hp_recovery_ratio) |
+| bard | 不攻击；范围内友军每秒获得 10% ATK 的生命缓回（`atk_to_hp_recovery_ratio`），使用 `regenerateHp`，不受禁疗阻挡 |
 | craftsman | melee phys (support devices via kit) |
 | shotprotector | ranged phys, can hit FLY, blocks 3 |
 | fortress | melee single target while blocking, ranged 1.0 splash otherwise, ground only (never hits FLY) |

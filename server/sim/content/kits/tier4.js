@@ -808,6 +808,14 @@ const kits = {
     const S1 = isSel(def, 'skchr_mizuki_1'), S2 = isSel(def, 'skchr_mizuki_2'), S3 = isSel(def, 'skchr_mizuki_3');
     const g = grid(def.skill?.rangeGrid);
     return {
+      // Declared only: this simulator has no Integrated Strategy mode installer.
+      modeOnlyMods: chess.module?.type === 'ISW-A' ? {
+        integratedStrategy: {
+          aspd: num(mb.attack_speed),
+          hpRegenRatio: num(mb.hp_recovery_per_sec_by_max_hp_ratio),
+          spRecoveryFlat: num(mb.sp_recovery_per_sec),
+        },
+      } : undefined,
       skills: alt(def, {
         skchr_mizuki_1: () => ({ kind: instantKind(def), attack: { atkScale: num(bb.atk_scale, 2) } }),
         skchr_mizuki_3: () => ({
@@ -1944,7 +1952,7 @@ const kits = {
           unit.mem.redist += dt;
           if (unit.mem.redist + 1e-9 < redistIv) return;
           unit.mem.redist -= redistIv;
-          const pool = battle.alliesInGrid(unit).filter((a) => !(a.s.flags.noHeal || a.profile?.noHeal) || a === unit);
+          const pool = battle.alliesInGrid(unit);
           let hp = 0, max = 0;
           for (const a of pool) { hp += a.hp; max += a.s.maxHp; }
           if (!(max > 0) || pool.length < 2) return;
@@ -1989,7 +1997,7 @@ const kits = {
               battle.fx('mote', { x: a.x, y: a.y, id: a.id });
             }
           });
-          battle.on('heal', (c) => {
+          battle.on('hpRegen', (c) => {
             if (c.source === unit && c.opts?.aura && c.target.findBuff(`cetsyr:mote:${unit.id}`)) c.amount *= num(t0['attack@trait_mul'], 1.5);
           }, { owner: unit });
         } },

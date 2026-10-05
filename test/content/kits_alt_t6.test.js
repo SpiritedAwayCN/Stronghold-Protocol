@@ -24,7 +24,7 @@ const approx = (a, b, msg = '', rel = 1e-6) => assert.ok(Math.abs(a - b) <= rel 
 const dummy = (key, o = {}) => enemyRec({ key, hp: 1e7, speed: 0, ...o });
 const READY = { sp: 999 };
 const IDLE = { sp: 0 };
-const HOOKS = ['damaged', 'heal', 'skillStart', 'skillEnd', 'statusApplied', 'attack', 'death', 'deploy', 'ammoUsed', 'elementHit'];
+const HOOKS = ['damaged', 'heal', 'hpRegen', 'skillStart', 'skillEnd', 'statusApplied', 'attack', 'death', 'deploy', 'ammoUsed', 'elementHit'];
 const plain = (id, o = {}) => chessRec({ id, skill: null, ...o });
 
 function run(o) {
@@ -333,7 +333,7 @@ test('6_04 浊心斯卡蒂 S1 同归殊途之吟: SP_FULL, full HP + max HP +; t
     approx(onAlly[0].amount, 1000 * (1 - bb.damage_resistance), 'the ally takes the rest');
     approx(onHer[0].amount, 1000 * bb.damage_resistance, 'she takes the transferred part');
     assert.equal(onHer[0].type, 'true');
-    const hh = heals(h, u, (c) => c.target === a && c.opts?.aura);
+    const hh = h.hooksOf('hpRegen').filter((c) => c.source === u && c.target === a && c.opts?.aura);
     assert.ok(hh.length > 0);
     approx(hh[hh.length - 1].amount, u.s.atk * bb['attack@atk_to_hp_recovery_ratio'], 'trait heal raised');
     done(h);
@@ -360,7 +360,7 @@ test('6_04 浊心斯卡蒂 S2 同葬无光之愿: toggle; 鼓舞 ATK and DEF (at
     assert.ok(!u.findBuff('inspire') && !u.findBuff('inspire:def'), 'never on herself');
     a.hp = a.s.maxHp * 0.5;
     h.run(1.1);
-    const hh = heals(h, u, (c) => c.target === a && c.opts?.aura);
+    const hh = h.hooksOf('hpRegen').filter((c) => c.source === u && c.target === a && c.opts?.aura);
     approx(hh[hh.length - 1].amount, u.s.atk * bb['attack@atk_to_hp_recovery_ratio'], 'trait heal ratio');
     done(h);
   }

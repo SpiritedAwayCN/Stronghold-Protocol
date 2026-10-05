@@ -112,7 +112,7 @@ import { aggregateMods } from '../../buffs.js';
 import { COLS, ROWS, PULL_STOP_RADIUS, CHAIN_RADIUS } from '../../constants.js';
 import { rotateOffset } from '../../dir.js';
 import { bodyDist, bodyInKeys, bodyKeys } from '../../body.js';
-import { hasHp } from '../../damage.js';
+import { canReceiveHealing, hasHp } from '../../damage.js';
 import { summonToken, TOKEN_IDS } from '../tokens.js';
 
 // ------------------------------------------------------------------------------------------------------------------
@@ -898,7 +898,7 @@ function yu(bb, chess, def) {
           const ops = opsOf(battle, unit.ownerId);
           if (ops.length < cnt) return;
           for (const a of s3On(unit) ? ops : [unit]) {
-            if (hr > 0) battle.heal(unit, a, a.s.maxHp * hr * iv, { self: true, silent: true });
+            if (hr > 0) battle.regenerateHp(unit, a, a.s.maxHp * hr * iv, { silent: true });
             if (er > 0) battle.reduceElement(a, a.s.maxHp * er * iv);
           }
         });
@@ -1015,7 +1015,7 @@ function skadi2(bb, chess, def) {
           }
           if (n % 2 === 0) {
             const amount = unit.s.atk * (on ? skillRatio : num(unit.profile?.auraRatio, auraRatio));
-            for (const a of allies) if (a.hp < a.s.maxHp) battle.heal(unit, a, amount, { aura: true });
+            for (const a of allies) if (a.hp < a.s.maxHp) battle.regenerateHp(unit, a, amount, { aura: true });
           }
         }, { owner: unit });
       },
@@ -3305,6 +3305,7 @@ function agoat2(bb, chess, def) {
           const b = battle.addBuff(t, {
             key: `agoat2:mist:${unit.id}`, duration: dur, refresh: 'stack', stacks: 1, maxStacks: max, interval: 1, source: unit, data: {},
             onTick: ({ unit: a, buff }) => {
+              if (!canReceiveHealing(unit, a)) return;
               const amt = num(buff.data.atk, unit.s.atk) * sc * Math.max(1, buff.stacks);
               battle.reduceElement(a, amt * epRatio());
               if (a.hp < a.s.maxHp) battle.heal(unit, a, amt, { hot: true });

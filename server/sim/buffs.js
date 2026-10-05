@@ -26,13 +26,13 @@ export const ADD_KEYS = Object.freeze([
 export const MUL_KEYS = Object.freeze([
   'atkMul', 'defMul', 'hpMul', 'resMul', 'moveMul', 'dmgDealtMul', 'dmgTakenMul', 'physTakenMul', 'artsTakenMul',
   'trueTakenMul', 'elemTakenMul', 'elementalTakenMul', 'healingDealtMul', 'healingTakenMul', 'spRecoveryMul', 'redeployMul',
-  'atkScaleMul', 'physDealtMul', 'artsDealtMul',
+  'atkScaleMul', 'physDealtMul', 'artsDealtMul', 'hpRegenMul',
 ]);
 /**
  * Boolean flag keys (OR). `taunt` is also accepted as a numeric mod. `liftoff` = 起飞 of an ally (蒂比's skills): blocks
  * no ground enemy (Battle._blockerFor), 对地规避 against ground enemies (targeting.js evadesGround); it stays a ground
  * unit on its tile (`unit.ground` unchanged). `noHeal` = no heal from another unit (and no heal pick of one); `healFree`
- * = 禁疗 that also stops the unit's own heals (damage.js heal: only an HP-regen attribute and a heal that "无视禁疗" pass —
+ * = 禁疗 that also stops the unit's own heals (regenerateHp and a heal that "无视禁疗" pass —
  * 史尔特尔's 余烬, which sets both). `stealthOff` = an enemy 隐匿 source switched off after a block (Battle._stealthSwitch).
  */
 export const FLAG_KEYS = Object.freeze([

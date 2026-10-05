@@ -31,7 +31,7 @@ import { createRng } from './rng.js';
 import { Grid } from './grid.js';
 import { Unit } from './units.js';
 import { makeBuff, STATUS, RESIST_STATUSES } from './buffs.js';
-import { dealDamage as pipeDamage, heal as pipeHeal, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
+import { dealDamage as pipeDamage, heal as pipeHeal, regenerateHp as pipeRegen, applyHpLoss, makeDamageInfo, reduceElement, palsyBuff, elementView, leaderHitCancelled } from './damage.js';
 import { absoluteRangeKeys, canTargetEnemy, extendedGrid, evadesGround, enemyStealthed, stealthOffKey } from './targeting.js';
 import { bodyKeys, bodyInKeys, bodyInRadius } from './body.js';
 import { normDir, mirrorDir, localOrder, localBefore } from './dir.js';
@@ -1335,7 +1335,7 @@ export class Battle {
         if (regen > 0 && u.hp < u.s.maxHp) {
           u._regenAcc = (u._regenAcc ?? 0) + regen * dt;
           if (u._regenAcc >= 1 || u.hp + u._regenAcc >= u.s.maxHp) {
-            this.heal(u, u, u._regenAcc, { self: true, silent: true, regen: true });
+            this.regenerateHp(u, u, u._regenAcc, { silent: true });
             u._regenAcc = 0;
           }
         }
@@ -1515,6 +1515,10 @@ export class Battle {
 
   heal(source, target, amount, opts = {}) {
     try { return pipeHeal(this, source, target, amount, opts); } catch (e) { this._internalError('heal', e); return 0; }
+  }
+
+  regenerateHp(source, target, amount, opts = {}) {
+    try { return pipeRegen(this, source, target, amount, opts); } catch (e) { this._internalError('regenerateHp', e); return 0; }
   }
 
   /**

@@ -18,7 +18,7 @@ const tbOf = (id) => raw(id).trait.bb;
 const approx = (a, b, msg = '', rel = 1e-6) => assert.ok(Math.abs(a - b) <= rel * Math.max(1, Math.abs(b)), `${msg} ${a} ≈ ${b}`);
 const dummy = (key, o = {}) => enemyRec({ key, hp: 1e7, speed: 0, ...o });
 const READY = { sp: 999 }; // carryState: skill fully charged at deployment
-const HOOKS = ['damaged', 'heal', 'skillStart', 'skillEnd', 'statusApplied', 'ammoUsed', 'attack', 'death', 'deploy'];
+const HOOKS = ['damaged', 'heal', 'hpRegen', 'skillStart', 'skillEnd', 'statusApplied', 'ammoUsed', 'attack', 'death', 'deploy'];
 
 /** Battle with captured noisy hooks, no auto-finish, long time limit. */
 function run(o) {
@@ -509,7 +509,7 @@ for (const [idA, idB] of [['chess_char_1_16_a', 'chess_char_1_16_b'], ['chess_ch
     assert.equal(z.length, bb.projectile_delay_time);
     for (const c of z) approx(c.amount, u.s.atk * bb.atk_scale);
     assert.equal(dealt(h, u, (c) => c.target === f && (c.dmg.tags || []).includes('zone')).length, 0, 'air units unaffected');
-    const zh = heals(h, u, (c) => c.target === yak);
+    const zh = h.hooksOf('hpRegen').filter((c) => c.source === u && c.target === yak);
     assert.equal(zh.length, bb.projectile_delay_time);
     for (const c of zh) approx(c.amount, u.s.atk * bb.hp_recovery_per_sec_ratio);
     done(h);
@@ -1025,7 +1025,7 @@ test('2_14 调香师: 精调 ATK +atk / ASPD −50; 熏衣草 heals every ally a
   assert.ok(u.skill.active);
   approx(u.s.atk, u.base.atk * (1 + bb.atk));
   approx(u.s.aspd, u.base.aspd + bb.attack_speed);
-  const aura = heals(h, u, (c) => c.target === far);
+  const aura = h.hooksOf('hpRegen').filter((c) => c.source === u && c.target === far);
   assert.equal(aura.length, 3, 'one pulse per second, out of range too');
   for (const c of aura) approx(c.amount, u.s.atk * t.atk_to_hp_recovery_ratio);
   done(h);

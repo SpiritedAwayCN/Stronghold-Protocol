@@ -859,7 +859,7 @@ test('魔王 S3: range up, trait heal 65 % ATK/s, 鼓舞 +65 % of her max HP, HP
   const id = 'chess_char_4_25_a', bb = D(id).skill.bb, t0 = D(id).talents[0].bb, t1 = D(id).talents[1].bb;
   const sarkaz = withTags(dummy({ key: 'enemy_sarkaz' }), ['sarkaz']);
   const h = makeBattle({ defs: { enemies: { enemy_sarkaz: sarkaz } }, units: [{ chessId: id, row: 10, col: 5 }, { chessId: 'chess_char_1_02_a', row: 10, col: 6 }, { chessId: 'chess_char_4_17_a', row: 9, col: 5 }],
-    timeLimit: 120, hooks: ['heal', 'damaged'], captureNoisy: true });
+    timeLimit: 120, hooks: ['heal', 'hpRegen', 'damaged'], captureNoisy: true });
   h.run(0.5);
   const u = h.unit(id), a = h.unit('chess_char_1_02_a'), b = h.unit('chess_char_4_17_a');
   assert.ok(a.findBuff(`cetsyr:mote:${u.id}`) && b.findBuff(`cetsyr:mote:${u.id}`), 'adjacent operators collect motes');
@@ -869,9 +869,9 @@ test('魔王 S3: range up, trait heal 65 % ATK/s, 鼓舞 +65 % of her max HP, HP
   h.b.dealDamage(e, a, { amount: 1000, type: 'true' });
   approx(noisy(h, 'damaged')[n0].amount, 1000 * (1 - t1.damage_resistance), 1e-9);
   // trait heal ×1.5 with a mote
-  h.runUntil(() => noisy(h, 'heal').some((c) => c.source === u && c.target === a), 3);
-  const hl = noisy(h, 'heal').find((c) => c.source === u && c.target === a);
-  approx(hl.amount, u.s.atk * D(id).traitBb['attack@atk_to_hp_recovery_ratio'] * t0['attack@trait_mul'] * a.s.healingTakenMul, 1e-6);
+  h.runUntil(() => noisy(h, 'hpRegen').some((c) => c.source === u && c.target === a), 3);
+  const hl = noisy(h, 'hpRegen').find((c) => c.source === u && c.target === a);
+  approx(hl.amount, u.s.atk * D(id).traitBb['attack@atk_to_hp_recovery_ratio'] * t0['attack@trait_mul'], 1e-6);
   // S3
   h.b.dealDamage(null, b, { amount: b.s.maxHp * 0.7, type: 'true' });
   assert.ok(u.skill.activate('test', { free: true }));
@@ -882,9 +882,9 @@ test('魔王 S3: range up, trait heal 65 % ATK/s, 鼓舞 +65 % of her max HP, HP
   for (let i = 0; i < 90 && !redistributed; i++) { h.step(); redistributed = h.events.some((ev) => ev[0] === 'fx' && ev[1] === 'redistribute'); }
   assert.ok(redistributed);
   approx(a.hpRatio, b.hpRatio, 1e-9, 'equal HP ratios after redistribution');
-  h.runUntil(() => noisy(h, 'heal').filter((c) => c.source === u && c.target === b && c.t > 0.8).length >= 1, 3);
-  const sh = noisy(h, 'heal').filter((c) => c.source === u && c.target === b).pop();
-  approx(sh.amount, u.s.atk * bb['attack@atk_to_hp_recovery_ratio'] * t0['attack@trait_mul'] * b.s.healingTakenMul, 1e-6, 'trait 65 %');
+  h.runUntil(() => noisy(h, 'hpRegen').filter((c) => c.source === u && c.target === b && c.t > 0.8).length >= 1, 3);
+  const sh = noisy(h, 'hpRegen').filter((c) => c.source === u && c.target === b).pop();
+  approx(sh.amount, u.s.atk * bb['attack@atk_to_hp_recovery_ratio'] * t0['attack@trait_mul'], 1e-6, 'trait 65 %');
   h.runUntil(() => !u.skill.active, 40);
   h.run(0.3);
   approx(a.s.maxHp, a.base.maxHp, 1e-9, '鼓舞 gone');
