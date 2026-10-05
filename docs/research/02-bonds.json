@@ -2727,14 +2727,14 @@
      },
      {
       "need": "5 distinct",
-      "effect": "The first 3 阿戈尔 members by position (the devour order: leftmost first, then topmost; fixed at battle start) each revive immediately on their own first knock-out, whatever the order of knock-outs (max_free_respawn_cnt 3)."
+    "effect": "The first 3 eligible 阿戈尔 knock-outs share immediate revives regardless of deployment position (max_free_respawn_cnt 3); each member can benefit only once. Forced exits and Skadi's module preventing a knock-out spend no shared revive."
      }
     ],
     "algorithm": [
      "Order: 阿戈尔 members sorted leftmost first, then topmost (\"更靠左和靠上\").",
      "Each 阿戈尔 in order marks the unit on the tile directly in front of it (its facing direction) and also the front-tile unit of every 阿戈尔 it has marked (chain). It never marks itself, a unit it already marked, or a unit that marked it.",
      "The marker immediately gains the base ATK of every unit it marked (added to base ATK at the final stage) and their block counts.",
-     "After all marks are placed, each mark makes its target suffer one 5000-point physical 流失 (HP loss, source = the target itself; if it dies, the kill is credited to the marker), resolved in marking order. A target that dies cancels its remaining pending marks.",
+    "After all marks are placed, each mark makes its target suffer one 5000-point physical 流失 (HP loss, source = the target itself; if it dies, the kill is credited to the marker), resolved in marking order. A target knocked out cancels its remaining pending marks even if immediately revived. Marks already placed by a dead marker still resolve; Skadi's module prevents retreat without changing deployment, so her pending marks continue.",
      "Each devoured unit adds layers to 阿戈尔 equal to its tier (1-6), once per unit per battle.",
      "(5-member tier) Revive is implemented as: when the unit leaves the field for any reason other than being moved, its next deployment has 0 redeploy time and 0 cost (PRTS). Devour layers: each devoured unit adds its tier once per battle (refreshes next round)."
     ],

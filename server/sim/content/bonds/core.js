@@ -16,8 +16,7 @@
 //   拉特兰 lateranoShip  member ammo skills start with floor(ammo × (1 + base_ammo_percent + ammo_percent_per_stack·L));
 //                        6: every ammo used by a member → all members ATK +atk_per_consume (≤ max_atk_for_consume)
 //   阿戈尔 egirShip      members max HP +(base_max_hp + max_hp_per_stack·L) (直接乘算); battle start devour (see devour());
-//                        5: the first max_free_respawn_cnt members by position (the devour's order, fixed at battle
-//                        start) each redeploy at once (free) on their first knock-out
+//                        5: the first max_free_respawn_cnt eligible knock-outs share free immediate redeploys
 //   叙拉古 siracusaShip  every member deployment: ASPD +(base + per·L) for (base_duration + per·L) s; 6: 隐匿 for the same
 //                        time, and while hidden / end_duration s after, every 普通伤害 hit (siracusaRolls) procs (PRD,
 //                        nominal `prob`) base_damage + damage_per_stack·L true damage + fear `fear` s
@@ -333,15 +332,13 @@ function installLaterano(battle, pid, bb, members) {
 
 // "更靠左和靠上": left first (on the player's own board: mirrored players count from the field's right), then top first —
 // row 0 is the BOTTOM row (DESIGN §3), so the top of the board is the highest row index. The order is a board position,
-// independent of the members' directions (only "身前" follows each member's `dir`). The devour marks in this order and the
-// 5-tier revive's beneficiaries are the first members in it (PRTS "从最先部署（更靠左和靠上的）的【阿戈尔】干员开始"; the
-// battle's initial deployment order, Battle.start).
+// independent of the members' directions (only "身前" follows each member's `dir`). The devour marks in this order.
 const boardCol = (u) => (u.player && u.player.mirror ? -u.tileC : u.tileC);
 const egirOrder = (a, b) => boardCol(a) - boardCol(b) || b.tileR - a.tileR || a.id - b.id;
 
 /**
  * 联防: an operator forced out at the deployment (carry.down, Battle.start, before battleStart) still stands on its
- * deploy position. The devour and the 5-tier revive slots both count it there (PRTS 盟约记录 前3名 / 最先部署).
+ * deploy position. It still participates in the devour.
  */
 function egirDownAtStart(battle, u) {
   return S.isOp(u) && !u.alive && u.removeReason === FORCED_EXIT && !!u.carry && u.carry.down === true
@@ -360,8 +357,7 @@ function egirDownAtStart(battle, u) {
  * (its own source: no DEF ignore), then battle.loseHp: no shields, dodge or damage multipliers (DEF-free until 0.1.1); the
  * kill is credited to the marker — in marking order. A target knocked out during the pass has its remaining marks
  * cancelled, also when it is back at once (the 5-tier 立刻复活, 不屈's 立刻重新部署, 埃芒加德 / M3茧甲): PRTS 盟约记录 "目标首次被
- * 击倒后解除自身被付与但还未触发的【吞噬】效果". A marker off the field gives no further mark (the rule since 0.1.0; one knocked
- * out and back in the same pass still gives its marks).
+ * 击倒后解除自身被付与但还未触发的【吞噬】效果". Marks already placed still resolve after their marker leaves the field.
  * 联防: the operators down since the end of their own combat (forced out by Battle.start) mark, are marked and resolve
  * their marks like standing ones, but nothing resolves on them (below; per players' reports, owner's decision 2026-10-04).
  * Each devoured operator adds its tier to 阿戈尔 once (IN_BATTLE gain, disabled in 联防 / boss fields).
@@ -419,7 +415,7 @@ function devour(battle, pid, bb, members) {
   for (const [m, t] of marks) {
     // (a member down since its own combat — downAtStart — resolves its marks as if it stood; a mark on it resolves nothing:
     // `knocked` — it is off the field)
-    if (knocked(t) || !(m.alive || downAtStart(m))) continue;
+    if (knocked(t)) continue;
     S.fxOn(battle, 'devour', t, 'bond:egirShip', 'devour', { from: m.id });
     if (amount > 0) battle.loseHp(t, mitigate(amount, 'phys', t.s), { source: m, tags: ['bond:egir:devour'] });
     if (!layered.has(t)) {
@@ -436,26 +432,10 @@ function installEgir(battle, pid, bb, members) {
   };
   apply();
   onLayers(battle, pid, 'egirShip', apply);
-  // 5: "前3名【阿戈尔】干员首次被击倒时立刻复活" — the 3 (bonds.json max_free_respawn_cnt) are the first 3 members BY POSITION,
-  // in the devour's order above = the battle's deployment order (PRTS 盟约记录 阿戈尔 备注 "从最先部署（更靠左和靠上的）的
-  // 【阿戈尔】干员开始"; players' videos: the revivers go by position, not by who is eaten or knocked out first). They are
-  // fixed at battle start, before the devour; each revives once, on its own first knock-out ('killed'), whatever the order
-  // of knock-outs, so a member the devour knocks out comes back only when it is one of them. Until 0.1.3 the first 3
-  // members knocked out took the revives and the devour's food spent them at t = 0. A member entering 联防 down (forced
-  // out before battleStart) keeps the slot its position earned: the forced exit is not a 击倒 (reason !== 'killed'), so
-  // the charge waits until they are knocked out after standing back up. A 调和 member counts like any other.
-  // [ASSUMED] a beneficiary 埃芒加德 / M3茧甲 save in place (items revivedInPlace, the stand-in for PRTS's 0-time redeploy)
-  // has used its revive (PRTS 不屈 备注: a held 复活 is consumed even when another effect redeploys the unit at once).
-  // PRTS: the knocked-out unit's next deployment has 0 redeploy time and 0 cost, i.e. it IS knocked out (被击倒 triggers,
-  // 克莱门莎, 幽灵鲨 … fire) and redeploys at once where it lies (the engine's rest tile, Battle._layBody: the tile it was
-  // knocked out on — a raid-relocated member comes back where it fell —, or its own home when it fell on another board
-  // piece's home; PRTS 卫戍协议/帮助 §作战阶段 单位部署) with full HP, SP reset and `deploy` effects (卡西米尔 / 叙拉古).
-  // Death priority 11: before 不屈 (10), whose redeploy "also consumes a 复活 charge" — with this order the charge is
-  // always the one used, same outcome. The marks still pending on a revived member are cancelled (devour).
   const max = reached(battle, pid, 'egirShip', bb.power_bond_char_cnt) ? Math.max(0, Math.floor(num(bb.max_free_respawn_cnt, 0))) : 0;
-  const holders = new Map(); // beneficiary → its in-place revives (mem.revives) at battle start
+  const holders = new Map();
   battle.on('battleStart', () => {
-    for (const u of members.filter((x) => S.isOp(x) && (S.onField(x) || egirDownAtStart(battle, x))).sort(egirOrder).slice(0, max)) holders.set(u, u.mem.revives | 0);
+    for (const u of members.filter((x) => S.isOp(x))) holders.set(u, u.mem.revives | 0);
     devour(battle, pid, bb, members);
   }, { once: true });
   if (!(max > 0)) return;
@@ -463,13 +443,14 @@ function installEgir(battle, pid, bb, members) {
   let revives = 0;
   battle.on('death', (c) => {
     const u = c.unit;
-    if (c.reason !== 'killed' || !holders.has(u) || used.has(u)) return;
+    if (c.reason !== 'killed' || !holders.has(u) || used.has(u) || revives >= max) return;
     used.add(u);
     if ((u.mem.revives | 0) !== holders.get(u)) return; // saved in place since the battle start: the revive is gone
     if (u.alive || u.removed) return;
-    if (!battle.redeploy(u, { free: true })) return;
     revives++;
-    S.fxOn(battle, 'revive', u, 'bond:egirShip', 'respawn', { n: revives });
+    const n = revives;
+    if (!battle.redeploy(u, { free: true })) { revives--; return; }
+    S.fxOn(battle, 'revive', u, 'bond:egirShip', 'respawn', { n });
   }, { priority: 11 });
 }
 
