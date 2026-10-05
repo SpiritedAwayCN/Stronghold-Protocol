@@ -390,8 +390,9 @@ shopSlots() effect(id)` (`piece(uid)` adds `area`, `holderUid`, `idx`; "身前�
 counters `counter(k) setCounter(k, v) incCounter(k, n)` (player scope, persistent; prefix keys with your module) and
 `pieceCounter(uid, k) incPieceCounter(uid, k, n)` (per piece, current round only: 0 in a new round and for a new piece —
 bought, granted, transformed —; a move keeps it; an elite merged this round keeps the highest of its copies'
-[ASSUMED]; `PlayerState.pieceRoundCount`; prefix keys with your module too) — 拉普兰德's "本回合首次主动刷新" is the
-first manual refresh that copy witnesses (player feedback after 0.1.0: "获得该干员后该回合的首次刷新" also stacks; a copy
+[ASSUMED]; `PlayerState.pieceRoundCount`; prefix keys with your module too) — 拉普兰德 scopes her refresh key by
+garrison ID, so her normal and elite traits each count their own first manual refresh, even after a same-round merge
+or in-place promotion (player feedback: "获得该干员后该回合的首次刷新" also stacks; a copy
 bought after selling one this round is a new copy and fires on its own first refresh [ASSUMED]).
 
 Writes (all validated, never throw on bad input, never make funds / pools negative):
@@ -788,9 +789,9 @@ round was over. The official 1 s `broadcastBeginDelay` is not modelled.
 * Promotions by effects (升华, 博士投影) keep the equipment; merges return it; 突变细胞's transformation returns it (the
   cell included) before its new operator is gained into the 整备区 — the carrier's tile is left empty (official footage,
   DESIGN §21.1).
-* An elite merged in a round keeps the highest per-piece round counter of its copies (`pieceRoundCount`): an elite made
-  from 拉普兰德 copies that already fired this round does not fire again before the next round (conservative; the
-  official server's instance handling is not observable). A 拉普兰德 bought after selling one in the same round is a new
+* An elite merged in a round keeps the highest per-piece round counter of its copies (`pieceRoundCount`), but 拉普兰德's
+  elite trait has a separate refresh key: its first manual refresh adds +8 even if the normal copies already fired.
+  In-place promotions use the same rule; moving does not reset it. A 拉普兰德 bought after selling one in the same round is a new
   copy and fires on its own first refresh ("获得该干员后"; each such +4 costs 3 + 1 refresh − 1 refund and needs her in
   the shop).
 * Chess granted by effects need a free pool copy unless `requirePool: false` (then they hold 0 copies).

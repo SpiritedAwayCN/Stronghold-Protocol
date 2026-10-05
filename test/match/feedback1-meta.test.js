@@ -94,7 +94,7 @@ test('#1 players\' scenario: 普罗旺斯 + 德克萨斯 deployed, refresh, buy 
   m.dispose();
 });
 
-test('#1 each copy counts its own refreshes: a bench copy (整备区时也有效) bought later fires on its own first refresh; an elite keeps "already fired"', () => {
+test('#1 each copy counts its own refreshes: a later bench copy fires; merging used copies grants a fresh elite trigger', () => {
   const s = setup();
   const { m, ps } = s;
   s.activate();
@@ -107,18 +107,63 @@ test('#1 each copy counts its own refreshes: a bench copy (整备区时也有效
   assert.equal(s.L(), 8, 'copy B: its first refresh (A already fired this round)');
   s.refresh();
   assert.equal(s.L(), 8, 'nothing more this round');
-  // the third copy completes the elite: A and B already fired this round, so the elite does not fire again this round
-  // [ASSUMED: conservative — the elite keeps the highest refresh count of its copies]
   const elite = s.buy(LAP);
   assert.equal(elite.id, LAP_B, 'merged into the elite');
   assert.ok(!ps.find(a.uid) && !ps.find(b.uid), 'copies consumed');
   s.refresh();
-  assert.equal(s.L(), 8, 'the elite made this round from copies that already fired: no second trigger');
+  assert.equal(s.L(), 16, 'the elite has its own first refresh: +8 even though its copies already fired');
+  s.refresh();
+  assert.equal(s.L(), 16, 'the elite fires only once in this round');
   s.h.toPrep(2);
   ps.funds = 50;
   s.activate();
   s.refresh();
-  assert.equal(s.L(), 8 + 8, 'R2: the elite fires +8 on the round\'s first refresh');
+  assert.equal(s.L(), 16 + 8, 'R2: the elite fires +8 on the round\'s first refresh');
+  checkInvariants(m);
+  m.dispose();
+});
+
+test('#1 a bench-only merge after the round first refresh grants +8 on the elite first refresh', () => {
+  const s = setup();
+  const { m, ps } = s;
+  s.activate();
+  s.refresh();
+  s.buy(LAP);
+  s.buy(LAP);
+  s.refresh();
+  assert.equal(s.L(), 8, 'both normal bench copies fire +4');
+  const elite = s.buy(LAP);
+  assert.equal(elite.id, LAP_B);
+  assert.equal(ps.find(elite.uid).area, 'hand');
+  s.refresh();
+  assert.equal(s.L(), 16, 'merged bench elite fires +8');
+  s.refresh();
+  assert.equal(s.L(), 16);
+  checkInvariants(m);
+  m.dispose();
+});
+
+test('#1 in-place promotion resets the trait first refresh, but moving the same form does not', () => {
+  const s = setup();
+  const { m, ps } = s;
+  s.activate();
+  s.refresh();
+  const lap = s.buy(LAP);
+  s.refresh();
+  assert.equal(s.L(), 4, 'newly bought bench copy fires after earlier player refreshes');
+  s.place(lap);
+  s.refresh();
+  assert.equal(s.L(), 4, 'deploying a used copy does not grant a second trigger');
+  const holo = giveItem(m, ps, 'chess_item_5_06_e_b');
+  assert.deepEqual(m.handle('p_0', { t: 'g.equip', itemUid: holo.uid, targetUid: lap.uid }), OK);
+  assert.equal(lap.id, LAP_B, 'golden 博士投影 promotes in place');
+  assert.equal(ps.find(lap.uid).area, 'board');
+  s.refresh();
+  assert.equal(s.L(), 12, 'promoted elite fires +8 in the same round');
+  const idx = ps.hand.findIndex((p) => p == null);
+  assert.deepEqual(m.handle('p_0', { t: 'g.move', uid: lap.uid, to: { area: 'hand', idx } }), OK);
+  s.refresh();
+  assert.equal(s.L(), 12, 'withdrawing the elite does not reset its trigger');
   checkInvariants(m);
   m.dispose();
 });
