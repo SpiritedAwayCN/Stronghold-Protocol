@@ -23,7 +23,7 @@ const rec = (id, skillId) => {
 const approx = (a, b, msg = '', rel = 1e-6) => assert.ok(Math.abs(a - b) <= rel * Math.max(1, Math.abs(b)), `${msg} ${a} ≈ ${b}`);
 const dummy = (key, o = {}) => enemyRec({ key, hp: 1e7, speed: 0, ...o });
 const ally = (id, o = {}) => chessRec({ id, skill: null, ...o, stats: { maxHp: 10000, atk: 0, def: 0, blockCnt: 0, respawnTime: 5, ...(o.stats || {}) } });
-const HOOKS = ['damaged', 'heal', 'hit', 'skillStart', 'skillEnd', 'statusApplied', 'ammoUsed', 'attack', 'death', 'deploy', 'kill'];
+const HOOKS = ['damaged', 'heal', 'hpRegen', 'hit', 'skillStart', 'skillEnd', 'statusApplied', 'ammoUsed', 'attack', 'death', 'deploy', 'kill'];
 /** Battle + one tick (the spawns of t = 0 exist afterwards). */
 const run = (o) => makeBattle({ seed: 7, autoFinish: false, timeLimit: 400, hooks: HOOKS, captureNoisy: true, ...o }).step();
 /** No more casts (a silence buff): lets a test watch the end of an effect without a recast. */
@@ -1019,7 +1019,7 @@ test('引星棘刺 S1 度算浪波: an alchemy unit on the lowest-HP ally: DEF +
     h.run(1.1);
     for (const a of [low, near]) assert.equal(a.s.def, 100 + bb.def, a.defId);
     assert.equal(far.s.def, 100);
-    approx(heals(h, u, (c) => c.target === near)[0].amount, u.s.atk * bb.hp_recovery_per_sec_ratio);
+    approx(h.hooksOf('hpRegen').find((c) => c.source === u && c.target === near).amount, u.s.atk * bb.hp_recovery_per_sec_ratio);
     mute(h, u);
     h.run(z.dur);
     assert.ok(!u.mem.zones.includes(z), 'expired');

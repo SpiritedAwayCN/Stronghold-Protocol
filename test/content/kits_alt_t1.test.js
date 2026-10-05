@@ -25,7 +25,7 @@ const approx = (a, b, msg = '', rel = 1e-6) => assert.ok(Math.abs(a - b) <= rel 
 const within = (a, b, tol = 0.05, msg = '') => assert.ok(Math.abs(a - b) <= tol, `${msg} ${a} ≈ ${b} ± ${tol}`);
 const dummy = (key, o = {}) => enemyRec({ key, hp: 1e7, speed: 0, ...o });
 const READY = { sp: 999 };
-const HOOKS = ['damaged', 'heal', 'hit', 'skillStart', 'skillEnd', 'statusApplied', 'ammoUsed', 'attack', 'death', 'deploy'];
+const HOOKS = ['damaged', 'heal', 'hpRegen', 'hit', 'skillStart', 'skillEnd', 'statusApplied', 'ammoUsed', 'attack', 'death', 'deploy'];
 const run = (o) => makeBattle({ seed: 7, autoFinish: false, timeLimit: 400, hooks: HOOKS, captureNoisy: true, ...o });
 /** defs.chess: the chess without its 特质 (garrisons have their own tests) — isolates kit numbers. */
 const noGarrison = (...ids) => Object.fromEntries(ids.map((id) => [id, { ...raw(id), garrisonIds: [] }]));
@@ -143,7 +143,7 @@ test('1_02 角峰 S1 体能强化: TAKE_DAMAGE (TANK S1) — HP +max_hp, +hp_rec
     u.hp = u.s.maxHp * 0.5;
     const t0 = h.b.time;
     h.run(3);
-    const regen = heals(h, u, (c) => c.target === u && c.opts?.regen && c.t > t0).reduce((n, c) => n + c.amount, 0);
+    const regen = h.hooksOf('hpRegen').filter((c) => c.source === u && c.target === u && c.t > t0).reduce((n, c) => n + c.amount, 0);
     assert.ok(Math.abs(regen - 3 * bb.hp_recovery_per_sec) <= 2, `${id} regenerated ${regen}`);
     h.runUntil(() => !u.skill.active, 40);
     within(ended(h, u)[0].t - started(h, u)[0].t, s.duration, 0.05, 'duration');
@@ -752,7 +752,7 @@ test('刺玫 土壤基肥改良 (+heal_scale healing received) never boosts HP r
   assert.equal(h.b.heal(y, y, 100, { self: true, silent: true, regen: true }), 100, '生命回复: unchanged');
   const t0 = h.b.time;
   h.run(3);
-  const regen = heals(h, y, (c) => c.target === y && c.opts?.regen && c.t > t0).reduce((n, c) => n + c.amount, 0);
+  const regen = h.hooksOf('hpRegen').filter((c) => c.source === y && c.target === y && c.t > t0).reduce((n, c) => n + c.amount, 0);
   assert.ok(Math.abs(regen - 3 * (y.s.hpRegen)) <= 2, `regen ${regen} ≈ ${3 * y.s.hpRegen} (no ×${t.heal_scale})`);
   assert.ok(v.alive && v.deployed);
   done(h);

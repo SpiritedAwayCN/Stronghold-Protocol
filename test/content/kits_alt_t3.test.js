@@ -582,7 +582,7 @@ test('3_12 瑕光 S2 慑敌辉光: ATK +, ground enemies on her tile sleep for t
     const b = SB(id, 'skchr_blemsh_2'), t1 = TB(id, 1);
     const dur = LD(id, 'skchr_blemsh_2').skill.duration;
     // (a MANUAL 重装 skill: TAKE_DAMAGE — the enemy she blocks hits her)
-    const h = makeBattle({ defs: { enemies: { enemy_d: dummy('enemy_d', { atk: 200, bat: 1 }), enemy_n: dummy('enemy_n') } }, timeLimit: 60, hooks: ['damaged', 'heal', 'skillStart'], captureNoisy: true,
+    const h = makeBattle({ defs: { enemies: { enemy_d: dummy('enemy_d', { atk: 200, bat: 1 }), enemy_n: dummy('enemy_n') } }, timeLimit: 60, hooks: ['damaged', 'heal', 'hpRegen', 'skillStart'], captureNoisy: true,
       units: [U(id, 'skchr_blemsh_2', 10, 4), { chessId: 'chess_char_3_16_a', row: 10, col: 6 }],
       enemies: [{ key: 'enemy_d', pos: [10, 4] }, { key: 'enemy_n', pos: [10, 5] }] });
     const u = h.unit(id), ally = h.unit('chess_char_3_16_a');
@@ -603,7 +603,7 @@ test('3_12 瑕光 S2 慑敌辉光: ATK +, ground enemies on her tile sleep for t
     const onSleeper = h.hooksOf('damaged').slice(n0).filter((c) => c.source === u && c.target === e && c.dmg?.isAttack);
     assert.ok(onSleeper.length >= 1, '仁慈: she hits the sleeper');
     approx(onSleeper[0].amount, u.s.atk * t1.atk_scale, 1e-6, '×仁慈');
-    const regen = h.hooksOf('heal').filter((c) => c.source === u && c.target === ally);
+    const regen = h.hooksOf('hpRegen').filter((c) => c.source === u && c.target === ally);
     assert.equal(regen.length, 2, 'once per second');
     approx(regen[0].amount, u.s.atk * b['attack@atk_to_hp_recovery_ratio']);
     done(h);

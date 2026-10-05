@@ -38,11 +38,11 @@ import { DataSource, getDefaultSource, spawnsFromTemplate } from '../../server/s
 import { TICK } from '../../server/sim/constants.js';
 
 export const ALL_HOOKS = Object.freeze([
-  'battleStart', 'deploy', 'tick', 'beforeAttack', 'attack', 'hit', 'damaged', 'heal', 'kill', 'death',
+  'battleStart', 'deploy', 'tick', 'beforeAttack', 'attack', 'hit', 'damaged', 'heal', 'hpRegen', 'kill', 'death',
   'skillStart', 'skillEnd', 'ammoUsed', 'spGain', 'statusApplied', 'blocked', 'enemySpawn', 'enemyLeak', 'battleEnd',
   'fatal', 'layerGain', 'elementBurst', 'dodge',
 ]);
-const NOISY = new Set(['tick', 'spGain', 'hit', 'damaged', 'beforeAttack', 'attack', 'heal']);
+const NOISY = new Set(['tick', 'spGain', 'hit', 'damaged', 'beforeAttack', 'attack', 'heal', 'hpRegen']);
 
 /**
  * Synthetic 19×21 stage: open lanes on the normal field (rows 9–12) and the boss field (rows 1–5).

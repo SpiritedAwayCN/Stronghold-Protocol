@@ -168,8 +168,9 @@ npm start          # 启动服务器：http://localhost:3000
 | [docs/PLAYING.md](docs/PLAYING.md) | 玩法指南：流程、经济、招募与晋升、摆阵、联防、盟约、最终攻势、结算称号 |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | 部署指南：Windows 开服与开机自启、防火墙、组网 / 隧道、反向代理与 HTTPS、Docker、systemd、排错 |
 | [docs/WINDOWS.md](docs/WINDOWS.md) | Windows 便携包：怎么打一份「零安装」包（`scripts/make-windows-bundle.mjs`）、包里放了什么、授权注意事项 |
-| [docs/DESIGN.md](docs/DESIGN.md) | 架构与契约（英文）：技术栈、目录分工、网络协议、渲染与 UI、各次试玩后的规则修订 |
-| [docs/SIM.md](docs/SIM.md) | 战斗模拟引擎参考（英文）：钩子、技能描述格式、职业默认行为 |
+| [docs/DESIGN.md](docs/DESIGN.md) | 架构与契约（英文，含中文修订）：技术栈、目录分工、网络协议、渲染与 UI、各次试玩后的规则修订 |
+| [docs/SIM.md](docs/SIM.md) | 战斗模拟引擎参考（英文，含中文修订）：钩子、技能描述格式、职业默认行为 |
+| [docs/HP-REGENERATION.md](docs/HP-REGENERATION.md) | 生命缓回修订说明：双通道架构、生效干员、禁疗边界与测试结果 |
 | [docs/META.md](docs/META.md) | 对局与经济引擎（英文）：回合流程、商店、联防、最终攻势的实现细节 |
 | [docs/DATA.md](docs/DATA.md) | 由官方数据表生成的游戏数据（英文） |
 | [docs/ASSETS.md](docs/ASSETS.md) | 素材来源、目录结构与清单（英文） |
