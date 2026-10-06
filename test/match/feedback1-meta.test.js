@@ -204,6 +204,42 @@ test('#1 only manual refreshes count: a re-triggered "刷新时" trait (ctx.trig
   m.dispose();
 });
 
+for (const scenario of ['normal', 'bench merge', 'board merge']) {
+  test(`#1 贾维 refresh gift (${scenario}): the gained 拉普兰德 first trigger belongs to the NEXT refresh`, () => {
+    const s = setup();
+    const { m, ps } = s;
+    ps.bandId = 'band_chiave';
+    ps.shop.level = 2;
+    const roll = m.pool.roll.bind(m.pool);
+    m.pool.roll = (rng, opts = {}) => rng === m.rngMeta && opts.filter && opts.filter(LAP) ? LAP : roll(rng, opts);
+    give(m, ps, PROVENCE, 'board', legalTileFor(m, ps, PROVENCE));
+    give(m, ps, TEXAS, 'board', legalTileFor(m, ps, TEXAS));
+    if (scenario !== 'normal') {
+      give(m, ps, LAP, scenario === 'board merge' ? 'board' : 'hand',
+        scenario === 'board merge' ? legalTileFor(m, ps, LAP) : null);
+      give(m, ps, LAP, 'hand');
+    }
+    for (let i = 0; i < 5; i++) s.refresh();
+    const before = s.L();
+    s.refresh();
+    const lap = ps.allChess().find((p) => p.id === (scenario === 'normal' ? LAP : LAP_B));
+    assert.ok(lap, 'the sixth refresh grants 拉普兰德, merging if two copies are owned');
+    assert.equal(s.L(), before, 'the gift cannot consume or fire its first trigger during the refresh granting it');
+    if (ps.find(lap.uid).area === 'hand') s.place(lap);
+    assert.ok(ps.bonds.siracusaShip.active, 'deploying the gift activates 叙拉古');
+    const layers = ps.layers.siracusaShip || 0;
+    const gain = scenario === 'normal' ? 4 : 8;
+    s.refresh();
+    assert.equal(s.L(), before + gain, 'the seventh refresh is the gift first refresh');
+    assert.equal((ps.layers.siracusaShip || 0) - layers, gain, 'actual 叙拉古 layers increase');
+    s.refresh();
+    assert.equal(s.L(), before + gain, 'subsequent refreshes do not trigger again');
+    assert.equal(m.dispatcher.errors, 0);
+    checkInvariants(m);
+    m.dispose();
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // #4 突变细胞
 
