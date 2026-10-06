@@ -19,6 +19,8 @@
 // slot's chess, SERVER_REFRESH_SHOP→onRefresh); the dispatcher calls `handler[hook] ?? handler.run`. A handler may
 // widen that per garrison with `garrisonHooks(garrison) → hook[]` (e.g. "<进入休整期时><休整期结束时>"). Owned-piece
 // garrisons fire for board pieces, and for hand pieces unless bbStr.conditionkey is 'character_target_inboard'.
+// onRefresh snapshots board/hand chess before any handler runs: a refresh gift or newly promoted elite waits for the
+// next refresh. Removed pieces and pieces whose form changed during this dispatch do not run their old traits.
 // 投资人 (investShip) active ⇒ SERVER_GAIN garrisons run ×2 (×3 at ≥ 100 layers) — owned by the dispatcher.
 // ctx.triggerGarrisons(uid, eventType) re-runs another piece's garrisons (铃兰, "触发…的获得时效果", 特质相同).
 // Items: onEquip / onArt / onDestroy go to the item's own handler only; every other hook runs for items equipped on
@@ -203,6 +205,11 @@ export class EffectDispatcher {
     if (deferItems) ps._deferItemMerge = (ps._deferItemMerge || 0) + 1;
     try {
       const reg = this.registry;
+      const refreshPieces = hook === 'onRefresh'
+        ? [...boardOrder(ps.board).map(({ piece }) => piece), ...ps.hand]
+          .filter((piece) => piece && piece.kind === 'chess')
+          .map((piece) => ({ piece, id: piece.id }))
+        : null;
       // 0. onPrice: the priced chess's own 特质 first — 购买价格为N defines the price every other modifier acts on
       if (hook === 'onPrice') this._garrisons(ps, hook, ev);
       // 1. globals
@@ -220,7 +227,7 @@ export class EffectDispatcher {
         if (h) this._call(ps, key, h, hook, { kind: 'bond', key, bondId, bond: ps.bonds[bondId] ?? null }, ev);
       }
       // 4. garrisons (onPrice: already run as step 0)
-      if (hook !== 'onPrice') this._garrisons(ps, hook, ev);
+      if (hook !== 'onPrice') this._garrisons(ps, hook, ev, refreshPieces);
       // 5. equipped items (not for the item-specific hooks): every [holder, item] pair of the owned chess, taken before
       // the first item runs; each runs only while still equipped on its still-owned holder — handlers move / destroy
       // pieces (header). Taking the pairs per holder as the walk reached it ran an item equipped meanwhile onto a later
@@ -278,7 +285,7 @@ export class EffectDispatcher {
     return [GARRISON_HOOK[g.eventType]];
   }
 
-  _garrisons(ps, hook, ev) {
+  _garrisons(ps, hook, ev, refreshPieces = null) {
     const gd = this.m.gd;
     const run = (piece, where) => {
       const rec = gd.chess(piece.id);
@@ -303,6 +310,14 @@ export class EffectDispatcher {
       return;
     }
     if (hook !== 'onRoundStart' && hook !== 'onPrepEnd' && hook !== 'onRefresh') return;
+    if (hook === 'onRefresh' && refreshPieces) {
+      for (const { piece, id } of refreshPieces) {
+        const loc = ps.find(piece.uid);
+        if (!loc || loc.piece !== piece || piece.id !== id || (loc.area !== 'board' && loc.area !== 'hand')) continue;
+        run(piece, loc.area);
+      }
+      return;
+    }
     for (const { piece } of boardOrder(ps.board)) if (piece.kind === 'chess') run(piece, 'board');
     for (const p of ps.hand) if (p && p.kind === 'chess') run(p, 'hand');
   }
