@@ -15,6 +15,7 @@
 //   --report       build report file (default: <repo>/.cache/build-data-report.json)
 //   --no-research  ignore docs/research (research-only fields fall back to defaults; for testing)
 //   --force        write the output even when integrity checks fail (default: keep the old files)
+//   --potentials-only update chess/tokens potential variants using existing output and the three official tables
 // Unknown options are errors (exit code 2).
 //
 // Official files are cached under <repo>/.cache/gamedata/<repo path> (e.g. excel/activity_table.json)
@@ -53,10 +54,10 @@ const USAGE = 'usage: node tools/build-data.mjs [--refresh | --offline] [--out <
  */
 function parseArgs(argv) {
   const opts = {
-    refresh: false, offline: false, quiet: false, noResearch: false, force: false,
+    refresh: false, offline: false, quiet: false, noResearch: false, force: false, potentialsOnly: false,
     out: join(ROOT, 'data'), cache: join(ROOT, '.cache', 'gamedata'), report: join(ROOT, '.cache', 'build-data-report.json'),
   };
-  const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
+  const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force', '--potentials-only': 'potentialsOnly' };
   const dirs = { '--out': 'out', '--cache': 'cache', '--report': 'report' };
   for (let i = 0; i < argv.length; i++) {
     const [name, inline] = argv[i].includes('=') ? [argv[i].slice(0, argv[i].indexOf('=')), argv[i].slice(argv[i].indexOf('=') + 1)] : [argv[i], null];
@@ -274,9 +275,9 @@ function unlocked(cond, phase, level, potRank = 0, reqPot = 0) {
   return (cond.level || 1) <= level;
 }
 /** Pick the best candidate (the last unlocked one) from an official candidate list. */
-function bestCandidate(cands, phase, level) {
+function bestCandidate(cands, phase, level, potentialRank = 0) {
   let best = null;
-  for (const c of cands || []) if (c && unlocked(c.unlockCondition, phase, level, 0, c.requiredPotentialRank)) best = c;
+  for (const c of cands || []) if (c && unlocked(c.unlockCondition, phase, level, potentialRank, c.requiredPotentialRank)) best = c;
   return best;
 }
 
@@ -565,10 +566,10 @@ function splitModuleParts(modulePhase) {
  * Mutates `traitBB`; returns the (possibly overridden) trait template, module text and trait range id.
  * @returns {{ template: string, moduleText: string|null, rangeId: string|null }}
  */
-function applyModuleTraitParts(parts, phase, level, traitBB, template, rangeId, label) {
+function applyModuleTraitParts(parts, phase, level, traitBB, template, rangeId, label, potentialRank = 0) {
   let moduleText = null;
   for (const part of parts || []) {
-    const mc = bestCandidate(part.overrideTraitDataBundle?.candidates, phase, level);
+    const mc = bestCandidate(part.overrideTraitDataBundle?.candidates, phase, level, potentialRank);
     if (!mc) continue;
     const mb = flattenBB(mc.blackboard, `${label} module trait`);
     Object.assign(traitBB.bb, mb.bb);
@@ -586,10 +587,10 @@ function applyModuleTraitParts(parts, phase, level, traitBB, template, rangeId, 
  * @returns {{ trait: object, classify: object }}
  */
 function traitRecord(ctx, char, phase, level, opParts, chessId) {
-  const tc = bestCandidate(char.trait?.candidates, phase, level);
+  const tc = bestCandidate(char.trait?.candidates, phase, level, ctx.potentialRank);
   const traitBB = flattenBB(tc?.blackboard, `${chessId} trait`);
   const traitMod = applyModuleTraitParts(opParts, phase, level, traitBB,
-    tc?.overrideDescripton || char.description || '', tc?.rangeId || null, chessId);
+    tc?.overrideDescripton || char.description || '', tc?.rangeId || null, chessId, ctx.potentialRank);
   const tp = textPair(traitMod.template, traitBB.bb, traitBB.bbStr, `${chessId} trait`);
   const trait = { desc: tp.desc, descRaw: tp.descRaw, bb: traitBB.bb, bbStr: traitBB.bbStr, rangeGrid: rangeGrid(ctx, traitMod.rangeId) };
   if (traitMod.moduleText) {
@@ -633,7 +634,7 @@ function buildTalents(ctx, char, phase, level, moduleParts, label, modPhase = ph
 function baseTalentList(ctx, char, phase, level, label) {
   const talents = [];
   (char.talents || []).forEach((t, index) => {
-    const c = bestCandidate(t.candidates, phase, level);
+    const c = bestCandidate(t.candidates, phase, level, ctx.potentialRank);
     if (!c) return;
     const { bb, bbStr } = flattenBB(c.blackboard, `${label} talent ${index}`);
     const { desc, descRaw } = textPair(c.description, bb, bbStr);
@@ -656,7 +657,7 @@ function moduleTalentChanges(ctx, moduleParts, modPhase, modLevel, label) {
   for (const part of moduleParts || []) {
     const cands = part.addOrOverrideTalentDataBundle?.candidates;
     if (!cands) continue;
-    const c = bestCandidate(cands, modPhase, modLevel);
+    const c = bestCandidate(cands, modPhase, modLevel, ctx.potentialRank);
     if (!c) continue;
     const { bb, bbStr } = flattenBB(c.blackboard, `${label} module talent`);
     const text = c.upgradeDescription || c.description;
@@ -3229,8 +3230,104 @@ function validateAll(f) {
 
 // ===== main =====================================================================================
 
+function addPotentialVariants(ctx, chess) {
+  const attributes = { MAX_HP: 'maxHp', ATK: 'atk', DEF: 'def', MAGIC_RESISTANCE: 'magicResistance', COST: 'cost', ATTACK_SPEED: 'attackSpeed', RESPAWN_TIME: 'respawnTime', BLOCK_CNT: 'blockCnt' };
+  for (const rec of Object.values(chess)) {
+    if (!rec.charId || rec.isDiy) continue;
+    const char = ctx.charTable[rec.charId];
+    if (!char) throw new Error(`potential data missing for ${rec.charId}`);
+    rec.potentials = {};
+    for (let rank = 1; rank <= 5; rank++) {
+      const source = { ...ctx, potentialRank: Math.min(rank, char.potentialRanks?.length || 0) };
+      const attrs = interpolateAttrs(char, rec.status.phase, rec.status.level);
+      for (const potential of (char.potentialRanks || []).slice(0, rank)) {
+        for (const modifier of potential.buff?.attributes?.attributeModifiers || []) {
+          const key = attributes[modifier.attributeType];
+          if (!key || modifier.formulaItem !== 'ADDITION') throw new Error(`unsupported potential modifier ${JSON.stringify(modifier)} for ${rec.charId}`);
+          attrs[key] += modifier.value;
+        }
+      }
+      const partsOf = (id) => splitModuleParts(ctx.battleEquip[id]?.phases?.find((entry) => entry.equipLevel === rec.status.equipLevel));
+      const baseTalents = baseTalentList(source, char, rec.status.phase, rec.status.level, rec.chessId);
+      for (const talent of baseTalents) {
+        const original = (rec.talentsBase || rec.talents).find((entry) => entry.index === talent.index);
+        if (original?.containerTokenKey) { talent.containerTokenKey = original.containerTokenKey; talent.tokenKey = original.tokenKey; }
+      }
+      const modules = rec.modules?.map((mod) => ({ ...mod,
+        traitOverride: mod.traitOverride ? traitRecord(source, char, rec.status.phase, rec.status.level, partsOf(mod.uniEquipId).op, rec.chessId).trait : null,
+        talentChanges: moduleTalentChanges(source, partsOf(mod.uniEquipId).op, rec.status.phase, rec.status.level, rec.chessId),
+      }));
+      const defaultModule = modules?.find((mod) => mod.isDefault);
+      const statsBase = statsFrom(attrs);
+      const traitBase = traitRecord(source, char, rec.status.phase, rec.status.level, [], rec.chessId).trait;
+      const variant = { stats: { ...statsBase }, trait: defaultModule?.traitOverride || traitBase,
+        talents: mergeTalentChanges(baseTalents, defaultModule?.talentChanges || []) };
+      for (const [key, value] of Object.entries(defaultModule?.attr || {})) variant.stats[key] += value;
+      if (rec.modules) Object.assign(variant, { statsBase, traitBase, talentsBase: baseTalents, modules });
+      const difference = {};
+      for (const [key, value] of Object.entries(variant)) if (JSON.stringify(value) !== JSON.stringify(rec[key])) difference[key] = value;
+      rec.potentials[rank] = difference;
+    }
+  }
+}
+
+function addTokenPotentialVariants(ctx, chess, tokens) {
+  for (const token of Object.values(tokens)) {
+    const char = ctx.charTable[token.tokenId];
+    if (!char) continue;
+    for (const [ownerId, variant] of Object.entries(token.variants || {})) {
+      const owner = chess[ownerId];
+      if (!owner) continue;
+      variant.potentials = {};
+      for (let rank = 1; rank <= 5; rank++) {
+        const source = { ...ctx, potentialRank: Math.min(rank, ctx.charTable[owner.charId]?.potentialRanks?.length || 0) };
+        const resolveModule = (moduleId) => {
+          const modulePhase = owner.status.equipLevel > 0 && moduleId !== 'none'
+            ? ctx.battleEquip[moduleId]?.phases?.find((entry) => entry.equipLevel === owner.status.equipLevel) : null;
+          const parts = splitModuleParts(modulePhase).token;
+          const candidate = bestCandidate(char.trait?.candidates, variant.phase, variant.level, source.potentialRank);
+          const blackboard = flattenBB(candidate?.blackboard);
+          const tr = applyModuleTraitParts(parts, owner.status.phase, owner.status.level, blackboard,
+            candidate?.overrideDescripton || char.description || '', null, token.tokenId, source.potentialRank);
+          const text = textPair(tr.template, blackboard.bb, blackboard.bbStr);
+          const trait = { desc: text.desc, descRaw: text.descRaw, bb: blackboard.bb, bbStr: blackboard.bbStr };
+          if (tr.moduleText) {
+            const moduleText = textPair(tr.moduleText, blackboard.bb, blackboard.bbStr);
+            Object.assign(trait, { moduleDesc: moduleText.desc, moduleDescRaw: moduleText.descRaw });
+          }
+          return { trait, talents: buildTalents(source, char, variant.phase, variant.level, parts,
+            token.tokenId, owner.status.phase, owner.status.level) };
+        };
+        const resolved = resolveModule(owner.module?.active ? owner.module.id : 'none');
+        const difference = {};
+        for (const [key, value] of Object.entries(resolved)) if (JSON.stringify(value) !== JSON.stringify(variant[key])) difference[key] = value;
+        if (variant.byModule) {
+          difference.byModule = {};
+          for (const [moduleId, mod] of Object.entries(variant.byModule)) difference.byModule[moduleId] = { ...mod, ...resolveModule(moduleId) };
+        }
+        variant.potentials[rank] = difference;
+      }
+    }
+  }
+}
+
 async function main() {
   const t0 = Date.now();
+  if (OPTS.potentialsOnly) {
+    const [charTable, battleEquip, rangeTable] = await Promise.all(['character_table', 'battle_equip_table', 'range_table'].map((name) => loadGamedata(`excel/${name}.json`)));
+    const chess = JSON.parse(await readFile(join(OPTS.out, 'chess.json'), 'utf8'));
+    const tokens = JSON.parse(await readFile(join(OPTS.out, 'tokens.json'), 'utf8'));
+    const context = { charTable, battleEquip, rangeTable };
+    addPotentialVariants(context, chess);
+    addTokenPotentialVariants(context, chess, tokens);
+    for (const [name, value] of Object.entries({ chess, tokens })) {
+      const dest = join(OPTS.out, `${name}.json`);
+      await writeFile(`${dest}.tmp`, JSON.stringify(value));
+      await rename(`${dest}.tmp`, dest);
+    }
+    log('wrote operator potential variants');
+    return;
+  }
   const ctx = await loadContext();
   log('building…');
   const { chess, tokenOwners } = buildChess(ctx);
@@ -3246,6 +3343,8 @@ async function main() {
   const factions = buildFactions(ctx, enemies);
   const bosses = buildBosses(ctx, enemies, waves);
   const choices = buildChoices(ctx, effects, items, chess);
+  addPotentialVariants(ctx, chess);
+  addTokenPotentialVariants(ctx, chess, tokens);
   // the bonds each strategy is built around (DESIGN §21.26): the bot skips, and the strategy draft marks 本局禁用, a band
   // whose bond the mode switches off
   for (const b of Object.values(bands)) b.bondIds = bandBondIds(b, { bonds, pools: choices.pools });

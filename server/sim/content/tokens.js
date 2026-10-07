@@ -132,6 +132,7 @@ function stateOf(battle) {
  */
 function withLoadout(v, lo) {
   if (!v || !lo || typeof lo !== 'object') return v;
+  if (v.potentials?.[lo.potentialRank]) v = { ...v, ...v.potentials[lo.potentialRank] };
   let out = v;
   if (Number.isInteger(lo.skillIndex) && v.bySkill && v.bySkill[lo.skillIndex]) out = { ...out, ...v.bySkill[lo.skillIndex] };
   if (typeof lo.moduleId === 'string' && v.byModule && v.byModule[lo.moduleId]) out = { ...out, ...v.byModule[lo.moduleId] };

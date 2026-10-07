@@ -25,7 +25,7 @@ Unknown options or a missing option value are errors (exit code 2); `--refresh` 
   Integrity errors (see §17) make the exit code 1 **and leave the previous output untouched** (unless `--force`);
   warnings never do. Each output file is written atomically (temp file + rename).
 - **Determinism.** Same inputs ⇒ byte-identical outputs (stable key order, no timestamps, no randomness).
-- **Size.** ≈3.5 MB total (limit 6 MB; `chess.json` ≈1.65 MB with the loadout choices), compact JSON (no indentation).
+- **Size.** ≈4.8 MB total (limit 6 MB; `chess.json` ≈2.82 MB with loadout choices and potential variants), compact JSON (no indentation).
 - **Derived paths.** `stages.json groundPaths*` come from the sim's own `server/sim/grid.js` pathing: a change there
   needs a rebuild (the offline-rebuild test catches a stale `data/`).
 
@@ -135,6 +135,8 @@ Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAft
 ---
 
 ## 2. `chess.json` — `{ [chessId]: Chess }` (266 = 133 normal + 133 golden)
+
+`potentials` maps upgrade ranks `1`–`5` to record-field differences from the unchanged rank-0 record (1潜, no potential bonuses). Each variant supplies changed `stats`, `trait`, `talents` and, for elites, `statsBase`, `traitBase`, `talentsBase` and `modules` as needed. Apply it before the selected skill/module composition. Attributes come from official `potentialRanks[].buff.attributes.attributeModifiers`; talent and module candidates retain the chess's existing promotion/level and use the chosen `requiredPotentialRank`. An operator without potential upgrades has empty differences. Summon owner variants in `tokens.json` carry corresponding `potentials` for module traits/talents only. Regenerate normally with build-data, or update these two files from the cached character/module/range tables using `node tools/build-data.mjs --offline --potentials-only`.
 
 112 are `visible` (non-hidden, non-DIY) normal chess: per tier 16/17/19/22/19/19. 17 are `isHidden` (retired
 上半 entries or effect-only such as `chess_char_1_15_a` 盟约·辅助干员 from band Pith); 4 are DIY (甄选) slots.

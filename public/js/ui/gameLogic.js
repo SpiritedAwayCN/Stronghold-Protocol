@@ -1808,7 +1808,7 @@ export function chessLoadout(chess, loadout, getChess = () => null) {
   // the record the unit fights with (stats / 特性 / talents of the chosen module or none — the battle's own composition,
   // shared/loadoutRecord.js): the detail card must show what the sim runs
   let record = chess;
-  try { record = loadoutRecord(chess, resolveRecordLoadout(chess, { skillIndex: r.skillIndex, moduleId: r.moduleId })) || chess; } catch { /* the record as is */ }
+  try { record = loadoutRecord(chess, resolveRecordLoadout(chess, { skillIndex: r.skillIndex, moduleId: r.moduleId, potentialRank: lo?.[chess.baseId || chess.chessId]?.potentialRank ?? lo?.potentialRank ?? 0 })) || chess; } catch { /* the record as is */ }
   return { skill, skillIndex: skill?.index ?? null, defaultSkill, module, defaultModule, changed: !defaultSkill || !defaultModule,
     choices: Math.max(skills.length, opt.skills?.length || 0), record };
 }
@@ -1827,6 +1827,7 @@ export function unitLoadout(chess, unit) {
   const baseId = chess.baseId || chess.chessId;
   if (typeof baseId !== 'string' || !baseId) return null;
   const e = {};
+  if (Number.isInteger(unit.potentialRank)) e.potentialRank = unit.potentialRank;
   if (Number.isInteger(unit.skillIndex) && unit.skillIndex >= 0) e.skill = unit.skillIndex;
   if (chess.isGolden && typeof unit.moduleId === 'string' && unit.moduleId) e.module = unit.moduleId;
   return Object.keys(e).length ? { [baseId]: e } : null;

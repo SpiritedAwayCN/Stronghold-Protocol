@@ -28,7 +28,8 @@ export function resolveRecordLoadout(rec, loadout = null) {
   const moduleId = mods && (wantMod === 'none' || (typeof wantMod === 'string' && mods.some((m) => m && m.uniEquipId === wantMod))) ? wantMod : defMod;
   const skillIsDefault = skillIndex === defSkill;
   const moduleIsDefault = moduleId === defMod;
-  return { skillIndex, moduleId, skillIsDefault, moduleIsDefault, isDefault: skillIsDefault && moduleIsDefault };
+  const potentialRank = Number.isInteger(lo.potentialRank) && lo.potentialRank >= 0 && lo.potentialRank <= 5 ? lo.potentialRank : 0;
+  return { skillIndex, moduleId, ...(potentialRank > 0 ? { potentialRank } : {}), skillIsDefault, moduleIsDefault, isDefault: skillIsDefault && moduleIsDefault && potentialRank === 0 };
 }
 
 const clean6 = (v) => (typeof v !== 'number' || !Number.isFinite(v) || Number.isInteger(v) || Math.abs(v) >= 1e6 ? v : Math.round(v * 1e6) / 1e6);
@@ -78,6 +79,8 @@ export function composeTalents(base, changes) {
  */
 export function loadoutRecord(rec, lo) {
   if (!rec || !lo || lo.isDefault) return rec;
+  const variant = rec.potentials?.[lo.potentialRank];
+  if (variant) rec = { ...rec, ...variant };
   const out = { ...rec };
   if (!lo.moduleIsDefault && Array.isArray(rec.modules)) {
     const m = lo.moduleId === 'none' ? null : rec.modules.find((x) => x.uniEquipId === lo.moduleId) ?? null;

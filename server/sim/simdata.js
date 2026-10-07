@@ -212,7 +212,7 @@ export { composeStats, composeTalents, loadoutRecord };
 
 /** Cache key suffix of a resolved non-default loadout ('' for the default). */
 export function loadoutKey(lo) {
-  return lo && !lo.isDefault ? `|s${lo.skillIndex}|m${lo.moduleId ?? ''}` : '';
+  return lo && !lo.isDefault ? `|s${lo.skillIndex}|m${lo.moduleId ?? ''}|p${lo.potentialRank ?? 0}` : '';
 }
 
 /** Build an immunity Set from an object `{stun:true,…}` or an array `['stun', 'feared']`. */
@@ -594,6 +594,7 @@ export class DataSource {
     }
     if (r && r.variants && !owner) owner = Object.keys(r.variants)[0] ?? null;
     let variant = r && r.variants && owner ? r.variants[owner] ?? null : null;
+    if (variant?.potentials?.[olo?.potentialRank]) variant = { ...variant, ...variant.potentials[olo.potentialRank] };
     if (variant && olo && !olo.isDefault) {
       if (!olo.skillIsDefault && variant.bySkill && variant.bySkill[olo.skillIndex]) variant = { ...variant, ...variant.bySkill[olo.skillIndex] };
       if (!olo.moduleIsDefault && variant.byModule && variant.byModule[olo.moduleId]) variant = { ...variant, ...variant.byModule[olo.moduleId] };
@@ -703,11 +704,11 @@ export function withUnitLoadouts(ds, players) {
   for (const p of Array.isArray(players) ? players : []) {
     for (const u of (p && Array.isArray(p.units) ? p.units : [])) {
       if (!u || u.kind === 'token' || typeof u.chessId !== 'string') continue;
-      if (u.skillIndex != null || u.moduleId != null) any = true;
-      const lo = { skillIndex: u.skillIndex ?? null, moduleId: u.moduleId ?? null };
+      if (u.skillIndex != null || u.moduleId != null || u.potentialRank != null) any = true;
+      const lo = { skillIndex: u.skillIndex ?? null, moduleId: u.moduleId ?? null, potentialRank: u.potentialRank ?? 0 };
       const prev = map.get(u.chessId);
       if (!prev) map.set(u.chessId, lo);
-      else if (prev.skillIndex !== lo.skillIndex || prev.moduleId !== lo.moduleId) conflicts.add(u.chessId);
+      else if (prev.skillIndex !== lo.skillIndex || prev.moduleId !== lo.moduleId || prev.potentialRank !== lo.potentialRank) conflicts.add(u.chessId);
     }
   }
   if (!any) return ds;

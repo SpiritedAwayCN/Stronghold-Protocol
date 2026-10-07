@@ -183,7 +183,8 @@ function PausedOverlay({ canResume, busy, onResume, onExit }) {
 function MatchScreen() {
   useDocClass('sp-in-match');
   const pub = useStore((s) => s.match.public);
-  const priv = useStore((s) => s.match.private);
+  const privateState = useStore((s) => s.match.private);
+  const priv = useMemo(() => privateState ? { ...privateState, loadout: { ...privateState.loadout, potentialRank: privateState.potentialRank ?? pub?.potentialRank ?? 0 } } : null, [privateState, pub?.potentialRank]);
   const field = useStore((s) => s.match.field);
   const myId = useStore((s) => s.me.playerId);
   const conn = useStore((s) => s.connection, shallowEqual);

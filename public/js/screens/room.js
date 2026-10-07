@@ -225,6 +225,7 @@ export function RoomScreen() {
     if (ok) run(`kick${seat}`, () => net.request('room.kick', { seat, playerId }));
   };
   const setDifficulty = (difficulty) => run('diff', () => net.request('room.setDifficulty', { difficulty }));
+  const setPotential = (potentialRank) => run('potential', () => net.request('room.setPotential', { potentialRank }));
   // spectator seats: the host frees one; a spectator takes a free player seat with room.join of this room
   const removeSpectator = (playerId) => run(`rs${playerId}`, () => net.request('room.removeSpectator', { playerId }));
   const sit = () => run('sit', () => net.request('room.join', { code: room.code }));
@@ -316,6 +317,18 @@ export function RoomScreen() {
         <div class="room-bar__status">${statusLine}</div>
       </div>
       <div class="room-bar__right">
+        <label class="room-settings">
+          <span>对局设置</span>
+          <select aria-label="所有干员潜能" value=${room.potentialRank ?? 5} disabled=${!facts.isHost || !!busy || !online || room.inMatch}
+            onChange=${(event) => setPotential(Number(event.currentTarget.value))}>
+            <option value="5">所有干员满潜（6潜）</option>
+            <option value="4">所有干员5潜</option>
+            <option value="3">所有干员4潜</option>
+            <option value="2">所有干员3潜</option>
+            <option value="1">所有干员2潜</option>
+            <option value="0">所有干员无潜能加成（1潜）</option>
+          </select>
+        </label>
         <${LoadoutButton} from="room" size="lg" class="room-loadout" />
         ${facts.isHost
           ? html`<${Tooltip} text=${facts.canStart ? null : '仍有博士未准备就绪'}>

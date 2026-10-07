@@ -48,6 +48,7 @@ export function unitInfo(u) {
     // DESIGN §16: an elite ally's equipped module (uniEquipId | 'none'; display only — a teammate's unit in a shared
     // field shows its owner's module in the detail card)
     moduleId: u.side === 'ally' && d.golden && typeof d.loadout?.moduleId === 'string' ? d.loadout.moduleId : undefined,
+    potentialRank: u.side === 'ally' && u.kind === 'op' ? d.loadout?.potentialRank ?? 0 : undefined,
     // an ally operator's equipped item ids (display: a 变形同构体 wearer counts for the bond it grants — the bond popup's
     // member list and the detail card's bond chips of a teammate's unit)
     items: u.side === 'ally' && u.kind === 'op' && Array.isArray(u.items) && u.items.length ? [...u.items] : undefined,

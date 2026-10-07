@@ -126,6 +126,7 @@ export class Room {
     this.code = code;
     this.mode = mode;
     this.difficulty = difficulty;
+    this.potentialRank = 5;
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
@@ -175,6 +176,7 @@ export class Room {
       hostId: this.hostId,
       mode: this.mode,
       difficulty: this.difficulty,
+      potentialRank: this.potentialRank,
       inMatch: !!this.match,
       seats: this.seats.map((s) => (s
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left }
@@ -284,6 +286,7 @@ export class Lobby {
       case 'room.leave': return this.leave(session);
       case 'room.ready': return this.ready(session, msg);
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
+      case 'room.setPotential': return this.setPotential(session, msg);
       case 'room.addBot': return this.addBot(session);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
@@ -470,6 +473,21 @@ export class Lobby {
     return OK;
   }
 
+  setPotential(session, { potentialRank }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (!Number.isInteger(potentialRank) || potentialRank < 0 || potentialRank > 5) return fail(ERR.BAD_MSG);
+    if (room.potentialRank !== potentialRank) {
+      this.dropReplay(room, session.playerId);
+      room.potentialRank = potentialRank;
+      for (const seat of room.seats) if (seat && !seat.isBot && seat.playerId !== room.hostId) seat.ready = false;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
   addBot(session) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
@@ -597,6 +615,7 @@ export class Lobby {
         roomCode: room.code,
         mode: room.mode,
         difficulty: room.difficulty,
+        potentialRank: room.potentialRank,
         modeId: modeIdFor(room.mode, room.difficulty),
         seats,
         // the spectator seats (header): watched like eliminated players, never players

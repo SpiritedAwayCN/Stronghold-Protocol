@@ -32,6 +32,11 @@ before(async () => {
 });
 after(() => fake.restore());
 
+test('renderInfo preserves an observed operator potential for its detail card', () => {
+  for (let rank = 0; rank <= 5; rank++) assert.equal(renderInfo({ id: 1, kind: 'op', side: 'ally', potentialRank: rank }).potentialRank, rank);
+  for (const rank of [undefined, -1, 6, 1.5, '5']) assert.equal(renderInfo({ id: 1, potentialRank: rank }).potentialRank, undefined);
+});
+
 const tick = () => new Promise((r) => setImmediate(r));
 const cam = () => presetCamera('normal', { width: 1280, height: 720 });
 

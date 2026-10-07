@@ -80,6 +80,7 @@ const LOADOUT_ID = /^[A-Za-z0-9_\-]{1,64}$/;
 export function sanitizeUnitLoadout(u) {
   if ('skillIndex' in u && !(Number.isInteger(u.skillIndex) && u.skillIndex >= 0 && u.skillIndex <= 9)) delete u.skillIndex;
   if ('moduleId' in u && !(typeof u.moduleId === 'string' && LOADOUT_ID.test(u.moduleId))) delete u.moduleId;
+  if ('potentialRank' in u && !(Number.isInteger(u.potentialRank) && u.potentialRank >= 0 && u.potentialRank <= 5)) delete u.potentialRank;
   if (u.kind === 'token') { delete u.skillIndex; delete u.moduleId; }
   return u;
 }

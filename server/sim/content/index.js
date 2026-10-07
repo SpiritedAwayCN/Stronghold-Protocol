@@ -93,8 +93,8 @@ function inputEntry(unit) {
 function inputLoadout(unit) {
   const x = inputEntry(unit);
   if (!x) return null;
-  if (x.skillIndex == null && x.moduleId == null) return {};
-  return { skillIndex: x.skillIndex ?? null, moduleId: x.moduleId ?? null };
+  if (x.skillIndex == null && x.moduleId == null && x.potentialRank == null) return {};
+  return { skillIndex: x.skillIndex ?? null, moduleId: x.moduleId ?? null, potentialRank: x.potentialRank ?? 0 };
 }
 
 /** Put a def on a not-yet-deployed ally (the fields Battle._makeAlly takes from the def). */

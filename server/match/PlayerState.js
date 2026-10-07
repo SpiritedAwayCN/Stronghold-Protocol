@@ -233,7 +233,7 @@ export class PlayerState {
 
   /** The skill index / module a chess record fights with under this player's loadout (DESIGN §16). */
   loadoutFor(chessRecord) {
-    return resolveLoadout(this.loadout, chessRecord, (id) => this.gd.chess(id));
+    return { ...resolveLoadout(this.loadout, chessRecord, (id) => this.gd.chess(id)), potentialRank: this.m.potentialRank ?? 0 };
   }
 
   /**
@@ -1557,6 +1557,7 @@ export class PlayerState {
         const lo = this.loadoutFor(this.gd.chess(piece.id));
         u.skillIndex = lo.skillIndex;
         u.moduleId = lo.moduleId;
+        u.potentialRank = lo.potentialRank;
         if (carry && carry.has(piece.uid)) u.carryState = carry.get(piece.uid);
         units.push(u);
       } else if (piece.kind === 'token') {
@@ -1662,6 +1663,7 @@ export class PlayerState {
       nextEnemies: this.m.nextEnemiesFor(this),
       // DESIGN §16: the effective operator loadout ({ [baseChessId]: { skill, module } }; chess not listed use defaults)
       loadout: this.loadout,
+      potentialRank: this.m.potentialRank ?? 0,
       stats: {
         dmgDealt: Math.round(this.stats.dmgDealt), kills: this.stats.kills, leaks: this.stats.leaks, gold: this.stats.gold,
         refreshes: this.stats.refreshes, merges: this.stats.merges,

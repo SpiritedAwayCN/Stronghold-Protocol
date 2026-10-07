@@ -245,6 +245,7 @@ export const C2S = {
   'room.leave': {},
   'room.ready': { ready: isBool },
   'room.setDifficulty': { difficulty: (v) => DIFFICULTIES.includes(v) },
+  'room.setPotential': { potentialRank: (v) => isInt(v, 0, 5) },
   'room.addBot': {},
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_SEATS - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the

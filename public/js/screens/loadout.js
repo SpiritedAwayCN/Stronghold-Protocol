@@ -266,7 +266,7 @@ export function LoadoutStats({ base, golden, entries, level, onLevel, getChess =
   </section>`;
 }
 
-function Detail({ m, chess, golden, entries, onChange, onReset, locked }) {
+function Detail({ m, chess, golden, entries, onChange, onReset, locked, potentialRank = 0 }) {
   const [level, setLevel] = useState('normal');
   const [statLevel, setStatLevel] = useState('elite'); // 局内数值: the 精锐 shows the chosen module's effect
   const bodyRef = useRef(null);
@@ -309,7 +309,7 @@ function Detail({ m, chess, golden, entries, onChange, onReset, locked }) {
             onPick=${(i) => onChange({ skill: i })} />`)}
         </div>
       </section>
-      <${LoadoutStats} base=${chess} golden=${golden} entries=${entries} level=${statLevel} onLevel=${setStatLevel} />
+      <${LoadoutStats} base=${chess} golden=${golden} entries=${{ ...entries, potentialRank }} level=${statLevel} onLevel=${setStatLevel} />
       ${golden ? html`<section class="lo-sec lo-sec--mod">
         <header class="lo-sec__head">
           <h3>模组<${MicroLabel}>MODULE<//></h3>
@@ -379,6 +379,7 @@ function LoadoutScreen({ st }) {
   const ready = useData('chess', 'bonds', 'assets', 'local');
   const phase = useStore((s) => s.match?.public?.phase || null);
   const inMatch = useStore((s) => !!s.room?.inMatch);
+  const potentialRank = useStore((s) => s.room?.inMatch ? s.match?.public?.potentialRank ?? 0 : s.room?.potentialRank ?? 0);
   // co-op briefing (INFO_CHECK, 25 s): the overlay covers the briefing's own countdown, so it shows the time left — the
   // match locks the loadout when it runs out (review fix: edits were silently only for the next match)
   const infoDeadline = useStore((s) => (s.match?.public?.phase === PHASE.INFO_CHECK ? s.match.public.deadline : 0));
@@ -505,7 +506,7 @@ function LoadoutScreen({ st }) {
       </section>
       <div class="lo-detail-wrap">
         <button type="button" class="lo-detail-back tapx" onClick=${() => setNarrowDetail(false)}><${Icon} name="chevronLeft" />干员列表</button>
-        <${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} onChange=${change} onReset=${resetOne} locked=${locked} />
+        <${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} onChange=${change} onReset=${resetOne} locked=${locked} potentialRank=${potentialRank} />
       </div>
     </main>`}
   </div>

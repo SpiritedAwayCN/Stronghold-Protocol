@@ -96,8 +96,8 @@ test('Battle._createAllyFromInput asks the data for the unit\'s own loadout (no 
   ];
   const b = new Battle({ seed: 3, kind: 'unite', stageId: 'act2autochess_m01', timeLimit: 30, players, spawns: [], routes: [], data: spy, recordEvents: false, quiet: true, content: 'none' });
   const mine = calls.filter(([id]) => id === MLYSS);
-  assert.deepEqual(mine[0], [MLYSS, { skillIndex: 0, moduleId: 'uniequip_003_mlyss' }]);
-  assert.deepEqual(mine[1], [MLYSS, { skillIndex: null, moduleId: null }], 'an entry without fields asks for the default');
+  assert.deepEqual(mine[0], [MLYSS, { skillIndex: 0, moduleId: 'uniequip_003_mlyss', potentialRank: 0 }]);
+  assert.deepEqual(mine[1], [MLYSS, { skillIndex: null, moduleId: null, potentialRank: 0 }], 'an entry without fields asks for the default');
   assert.equal(opOf(b, 'p1', 1).def.loadout.moduleId, 'uniequip_003_mlyss');
   assert.equal(opOf(b, 'p2', 1).def.loadout.isDefault, true);
 });
