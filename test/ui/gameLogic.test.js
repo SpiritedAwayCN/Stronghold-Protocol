@@ -361,10 +361,11 @@ describe('placement mirror (canPlace)', () => {
     assert.equal(eqI.t, 'g.equip'); assert.equal(eqI.confirmReplace, true, '2 items equipped ⇒ confirm');
     const eqH = dropIntent(ctx, eq.uid, { area: 'hand', idx: 0 });
     assert.equal(eqH.confirmReplace, false);
-    const consumable = Object.values(items).find((x) => x.itemType === 'EQUIP' && String(x.kind).startsWith('consume_on_equip'));
+    // official: a consume-on-equip item on a full carrier replaces too (the pick is destroyed, a slot is left free)
+    const consumable = Object.values(items).find((x) => x.itemType === 'EQUIP' && String(x.kind).startsWith('consume_on_equip') && x.kind !== 'consume_on_equip_or_delayed');
     const cons = item(consumable.id);
     const ctxC = ctxFor(privWith({ board: [b], hand: [{ idx: 3, piece: cons }] }));
-    assert.equal(dropIntent(ctxC, cons.uid, { area: 'board', row: 9, col: 3 }).confirmReplace, false, 'consumed on equip: nothing is replaced');
+    assert.equal(dropIntent(ctxC, cons.uid, { area: 'board', row: 9, col: 3 }).confirmReplace, true, 'consumed on equip: still replaces on a full carrier');
     const ar = dropIntent(ctx, art.uid, { area: 'board', row: 12, col: 6 });
     assert.deepEqual(ar, { t: 'g.art', fields: { itemUid: art.uid, row: 12, col: 6 } });
     for (const i of [mv, back, eqI, eqH, ar]) assert.equal(validateC2S({ t: i.t, ...i.fields }), null, i.t);
