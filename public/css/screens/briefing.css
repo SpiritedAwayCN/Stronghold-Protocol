@@ -88,7 +88,11 @@
 
 .brief-banned { padding: .16rem .2rem .2rem; background: rgba(12, 15, 14, .8); border: 1px solid var(--line); }
 .brief-banned__n { margin-left: auto; font-size: calc(.22 * var(--t)); color: var(--red-premium); }
-.brief-banned__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(.6rem, 1fr)); gap: .08rem; }
+.brief-banned__grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .12rem; }
+.brief-banned__row { display: grid; grid-template-columns: .6rem minmax(0, 1fr); align-items: center; gap: .12rem; }
+.brief-banned__bond { display: flex; align-items: center; justify-content: center; }
+.brief-banned__bond .bond { --disc: .6rem; }
+.brief-banned__members { display: flex; flex-wrap: wrap; gap: .08rem; min-width: 0; }
 .brief-banned__grid .uthumb { --ut: .6rem; }
 /* 0.2.0: the player's own 自选 pieces out of the shop this match (ui/matchInfo.js DiyBannedLine; m.private.diyBanned) */
 .brief-banned__diy { margin: .1rem 0 0; font-size: calc(.14 * var(--t)); line-height: 1.5; color: var(--text-dim, #b8c2bf); }

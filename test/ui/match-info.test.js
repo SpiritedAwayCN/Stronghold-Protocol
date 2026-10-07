@@ -2,7 +2,7 @@
 // strategy draft there was no way to see the disabled bonds and the banned operators again, though players choose a
 // strategy partly by them. ui/matchInfo.js is now the one implementation of the briefing's bond rows (greyed: the drawn
 // set D and the mode's static inactive bonds; the banned-member badge; briefingBondTip), the legend and the 本局禁用干员
-// grid (by tier): the briefing renders it (MatchInfo), the draft's 本局信息 dialog renders the same blocks
+// rows (by disabled bond, members by tier): the briefing renders it (MatchInfo), the draft's 本局信息 dialog renders the same blocks
 // (MatchInfoDialog), and the in-game 本局信息 tab reads the same model (matchInfoModel). The dialog's status line repeats
 // the turn and its countdown (bandDraft.js draftInfoStatus) and a turn change closes it. Browser: test/ui/match-info.e2e.test.js.
 import { test } from 'node:test';
@@ -116,12 +116,41 @@ test('MatchLegend: the grey and the badge; "或本模式禁用" only when the mo
   assert.doesNotMatch(textOf(MatchLegend({ model: hard })), /本模式禁用/);
 });
 
-test('BannedOperators: the count and dimmed avatars in tier order; none ⇒ 本局没有禁用干员', () => {
+test('matchInfoModel: disabled bond groups follow the displayed core/add-on order, repeat members and keep empty rows', () => {
+  const bonds = [
+    { bondId: 'addon', name: '附加', bondOrder: 0, identifier: 1, visibleMembers: ['a', 'b'] },
+    { bondId: 'core-late', name: '核心二', isCore: true, bondOrder: 2, visibleMembers: ['a'] },
+    { bondId: 'enabled', isCore: true, bondOrder: 0, visibleMembers: ['a'] },
+    { bondId: 'core-first', name: '核心一', isCore: true, bondOrder: 1, visibleMembers: ['unknown'] },
+  ];
+  const chess = (id) => ({ a: { tier: 3 }, b: { tier: 1 }, allowed: { tier: 2 } })[id];
+  const m = matchInfoModel({
+    drawnDisabledBonds: ['addon', 'core-first'], bannedChess: ['a', 'unknown', 'b'],
+  }, { bonds, chess, mode: { inactiveBondIds: ['core-late'] } });
+  assert.deepEqual(m.bannedGroups.map(({ bond, members }) => [bond.bondId, members]),
+    [['core-first', []], ['core-late', ['a']], ['addon', ['b', 'a']]]);
+  const block = BannedOperators({ model: m });
+  assert.match(textOf(block), /BANNED OPERATORS2/);
+  assert.deepEqual([...walk(block)].filter((v) => hasClass(v, 'brief-banned__row')).map((v) => v.props['data-bond']),
+    ['core-first', 'core-late', 'addon']);
+  const discs = [...walk(block)].filter((v) => v.type === BondDisc);
+  assert.ok(discs.every((v) => v.props.disabled && v.props.showName === false));
+  assert.deepEqual([...walk(block)].filter((v) => v.type === UnitThumb).map((v) => v.props.id), ['a', 'b', 'a']);
+  const empty = matchInfoModel({ drawnDisabledBonds: ['addon'] }, { bonds, chess });
+  assert.deepEqual(empty.bannedGroups.map(({ bond, members }) => [bond.bondId, members]), [['addon', []]]);
+  assert.equal([...walk(BannedOperators({ model: empty }))].filter((v) => hasClass(v, 'brief-banned__row')).length, 1);
+});
+
+test('BannedOperators: the unique count and dimmed avatars grouped by disabled bond, in tier order; none ⇒ 本局没有禁用干员', () => {
   const m = model();
   const block = BannedOperators({ model: m });
   assert.match(textOf(block), /本局禁用干员BANNED OPERATORS4/);
   const thumbs = [...walk(block)].filter((v) => v.type === UnitThumb);
-  assert.deepEqual(thumbs.map((v) => v.props.id), m.banned);
+  assert.deepEqual(thumbs.map((v) => v.props.id), m.bannedGroups.flatMap((g) => g.members));
+  for (const { bond, members } of m.bannedGroups) {
+    assert.ok(m.stateOf(bond.bondId));
+    assert.deepEqual(members, m.banned.filter((id) => bond.visibleMembers.includes(id)));
+  }
   assert.ok(thumbs.every((v) => v.props.kind === 'chess' && v.props.dim === true && v.props.size === 'sm'));
   const none = BannedOperators({ model: matchInfoModel({}, SRC('mode_single_normal')) });
   assert.match(textOf(none), /本局没有禁用干员/);
@@ -165,6 +194,9 @@ test('a real 标准 match (solo and co-op): the mode\'s 10 inactive bonds are "o
     assert.deepEqual([...m.banned].sort(), [...pub.bannedChess].sort(), 'every banned operator is known');
     assert.deepEqual(m.banned.map((id) => DATA.chess[id].tier), [...m.banned.map((id) => DATA.chess[id].tier)].sort((a, b) => a - b));
     for (const id of m.banned) assert.ok(DATA.chess[id].bonds.every((b) => m.stateOf(b)), `${id}: every bond greyed`);
+    assert.deepEqual([...new Set(m.bannedGroups.flatMap((g) => g.members))].sort(), [...m.banned].sort(), 'groups cover every banned operator');
+    assert.deepEqual(m.bannedGroups.map((g) => g.bond.bondId),
+      [...m.core, ...m.addon].filter((b) => m.stateOf(b.bondId)).map((b) => b.bondId), 'same order as the upper rows');
     assert.equal(m.addon.filter((b) => m.stateOf(b.bondId)).length + m.core.filter((b) => m.stateOf(b.bondId)).length, 11);
     assert.match(textOf(MatchLegend({ model: m })), /或本模式禁用/);
     h.m.dispose();
@@ -175,6 +207,7 @@ test('a real 标准 match (solo and co-op): the mode\'s 10 inactive bonds are "o
   assert.equal(m.sets.off.size, 0);
   assert.deepEqual([m.core.filter((b) => m.stateOf(b.bondId)).length, m.addon.filter((b) => m.stateOf(b.bondId)).length], [3, 4]);
   assert.deepEqual([...m.banned].sort(), [...h.m.bannedChess].sort());
+  assert.deepEqual([...new Set(m.bannedGroups.flatMap((g) => g.members))].sort(), [...m.banned].sort());
   h.m.dispose();
 });
 

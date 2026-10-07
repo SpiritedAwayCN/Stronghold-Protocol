@@ -144,6 +144,10 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
       legend: scope.querySelector('.brief-legend')?.textContent.trim() || '',
       count: scope.querySelector('.brief-banned__n')?.textContent.trim() || '',
       banned: [...scope.querySelectorAll('.brief-banned__grid .uthumb')].map((el) => el.getAttribute('title')),
+      bannedGroups: [...scope.querySelectorAll('.brief-banned__row')].map((el) => ({
+        id: el.dataset.bond,
+        names: [...el.querySelectorAll('.uthumb')].map((thumb) => thumb.getAttribute('title')),
+      })),
     };
   }, root);
   /** What the server says: greyed = the drawn set ∪ the mode's inactive bonds; banned names by tier. */
@@ -153,10 +157,53 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
     const mode = data.get('config')?.modes?.[pub.modeId];
     const greyed = [...new Set([...(pub.drawnDisabledBonds || []), ...(mode?.inactiveBondIds || [])])].sort();
     const chess = pub.bannedChess.map((id) => data.lookup('chess', id)).filter(Boolean);
-    return { greyed, off: (mode?.inactiveBondIds || []).slice().sort(), tiers: chess.map((c) => c.tier), names: chess.slice().sort((a, b) => a.tier - b.tier).map((c) => c.name) };
+    const bonds = data.list('bonds').slice().sort((a, b) => (a.bondOrder ?? 0) - (b.bondOrder ?? 0) || (a.identifier ?? 0) - (b.identifier ?? 0));
+    const sortedChess = chess.slice().sort((a, b) => a.tier - b.tier);
+    const bannedGroups = [...bonds.filter((b) => b.isCore), ...bonds.filter((b) => !b.isCore)]
+      .filter((b) => greyed.includes(b.bondId)).map((b) => ({
+        id: b.bondId, names: sortedChess.filter((c) => b.visibleMembers.includes(c.chessId)).map((c) => c.name),
+      }));
+    return { greyed, off: (mode?.inactiveBondIds || []).slice().sort(), tiers: chess.map((c) => c.tier), names: sortedChess.map((c) => c.name), bannedGroups };
   });
   const greyedOf = (info) => info.bonds.filter((b) => b.off).map((b) => b.id).sort();
   const selBand = (page) => page.evaluate(() => document.querySelector('.dband.is-sel .dband__name')?.textContent || null);
+
+  async function assertBannedLayout(page, root) {
+    const layout = await page.evaluate((root) => {
+      const grid = document.querySelector(`${root} .brief-banned__grid`);
+      const rows = [...grid.querySelectorAll('.brief-banned__row')];
+      const gridRect = grid.getBoundingClientRect();
+      const fullWidth = rows.every((row) => {
+        const rect = row.getBoundingClientRect();
+        return Math.abs(rect.left - gridRect.left) < 1 && Math.abs(rect.right - gridRect.right) < 1;
+      });
+      const stacked = rows.every((row, i) => i === 0 ||
+        row.getBoundingClientRect().top >= rows[i - 1].getBoundingClientRect().bottom);
+      const fits = rows.every((row) => {
+        const rect = row.getBoundingClientRect();
+        return [...row.querySelectorAll('.uthumb')].every((thumb) => thumb.getBoundingClientRect().right <= rect.right + 1);
+      });
+      const row = rows.find((el) => el.querySelectorAll('.uthumb').length >= 2);
+      if (!row) return { fullWidth, stacked, fits, wrapped: false };
+      const bond = row.querySelector('.brief-banned__bond');
+      const members = row.querySelector('.brief-banned__members');
+      const thumbs = [...members.querySelectorAll('.uthumb')];
+      const previousWidth = grid.style.width;
+      grid.style.width = `${bond.getBoundingClientRect().width + parseFloat(getComputedStyle(row).columnGap) + thumbs[0].getBoundingClientRect().width * 1.5}px`;
+      const br = bond.getBoundingClientRect();
+      const mr = members.getBoundingClientRect();
+      const result = {
+        fullWidth, stacked, fits, wrapped: thumbs[1].getBoundingClientRect().top > thumbs[0].getBoundingClientRect().top,
+        centered: Math.abs((br.top + br.bottom) / 2 - (mr.top + mr.bottom) / 2) < 1,
+        narrow: br.width <= thumbs[0].getBoundingClientRect().width + 5,
+        borderless: ['Top', 'Right', 'Bottom', 'Left'].every((side) => parseFloat(getComputedStyle(row)[`border${side}Width`]) === 0),
+      };
+      grid.style.width = previousWidth;
+      return result;
+    }, root);
+    assert.deepEqual(layout, { fullWidth: true, stacked: true, fits: true, wrapped: true, centered: true, narrow: true, borderless: true },
+      `${root}: full-width stacked rows, borderless narrow bond column, wrapping operators and vertically centered icon`);
+  }
 
   async function openDialog(p) {
     await press(p, '[data-testid="match-info-open"]');
@@ -178,9 +225,11 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
     const want = await truth(page);
     assert.deepEqual(want.off, [...OFF_FUNNY].sort(), '标准模拟 switches the official 10 bonds off');
     assert.deepEqual(greyedOf(brief), want.greyed, 'the briefing greys D ∪ the mode\'s inactive bonds');
-    assert.deepEqual(brief.banned, want.names, 'the briefing\'s banned operators, by tier');
+    assert.deepEqual(brief.bannedGroups, want.bannedGroups, 'disabled bonds in briefing order, with their banned operators by tier');
+    assert.deepEqual(brief.banned, want.bannedGroups.flatMap((g) => g.names), 'members may repeat across bonds');
     assert.equal(brief.count, String(want.names.length));
     assert.match(brief.legend, /或本模式禁用/);
+    await assertBannedLayout(page, '.brief__right');
     await shot(page, 'solo-briefing');
 
     await press(p, '.brief__foot .btn--primary', '准备就绪');
@@ -195,6 +244,7 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
     await openDialog(p);
     const dlg = await readInfo(page, '.minfo-dlg');
     assert.deepEqual(dlg, brief, 'the dialog shows exactly the briefing\'s bonds, badges, legend and banned operators');
+    await assertBannedLayout(page, '.minfo-dlg');
     assert.deepEqual(dlg.rows, ['核心盟约', '附加盟约']);
     assert.ok(dlg.bonds.filter((b) => b.off).every((b) => b.x), 'every greyed disc carries the ✕');
     const arcane = await centre(page, '.minfo-dlg .brief-bond[data-bond="arcaneShip"] .bond__disc');
@@ -205,8 +255,15 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
     assert.equal(status, '轮到你决策', 'solo: untimed — no seconds');
     const box = await page.$eval('.minfo-dlg', (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; });
     assert.ok(box.top >= 0 && box.bottom <= 1080 && box.left >= 0 && box.right <= 1920, `inside the screen ${JSON.stringify(box)}`);
-    const fits = await page.$eval('.minfo-dlg .modal__body', (el) => el.scrollHeight <= el.clientHeight + 1);
-    assert.ok(fits, 'desktop: everything visible without scrolling');
+    const reachable = await page.$eval('.minfo-dlg .modal__body', (el) => {
+      el.scrollTop = el.scrollHeight;
+      const body = el.getBoundingClientRect();
+      const last = el.querySelector('.brief-banned__row:last-child').getBoundingClientRect();
+      const result = getComputedStyle(el).overflowY === 'auto' && last.top >= body.top && last.bottom <= body.bottom + 1;
+      el.scrollTop = 0;
+      return result;
+    });
+    assert.ok(reachable, 'desktop: the longer grouped list scrolls to its last row inside the dialog');
     await shot(page, 'solo-dialog');
 
     // Esc
@@ -249,7 +306,7 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
     }));
     assert.deepEqual(tab.off.sort(), brief.bonds.filter((b) => b.off).map((b) => b.name).sort(), 'the same greyed bonds');
     for (const b of brief.bonds) if (b.ban) assert.equal(tab.ban[b.name], b.ban, `${b.name}: the same badge`);
-    assert.deepEqual(tab.banned, brief.banned, 'the same banned operators, in the same (tier) order');
+    assert.deepEqual(tab.banned, want.names, 'the in-game tab keeps its unique tier-ordered list');
     assert.equal(tab.count, brief.count);
     await shot(page, 'solo-ingame-tab');
     assert.deepEqual(p.problems, []);
@@ -278,7 +335,8 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
     assert.equal(want.greyed.length, 7, '3 core + 4 add-on bonds drawn');
     for (const [p, info] of briefs) {
       assert.deepEqual(greyedOf(info), want.greyed, `${p.name}: briefing greyed`);
-      assert.deepEqual(info.banned, want.names, `${p.name}: briefing banned`);
+      assert.deepEqual(info.bannedGroups, want.bannedGroups, `${p.name}: briefing banned groups`);
+      assert.deepEqual(info.banned, want.bannedGroups.flatMap((g) => g.names), `${p.name}: briefing banned`);
       assert.doesNotMatch(info.legend, /本模式禁用/);
     }
     assert.deepEqual(briefs.get(b), briefs.get(a), 'both players see the same briefing');
@@ -355,6 +413,7 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
       assert.ok(lay.status && lay.close, `${w}×${h}: the status line and 关闭 stay in view`);
       assert.ok(lay.scrolls && lay.overflow === 'auto', `${w}×${h}: the body scrolls`);
       assert.deepEqual(await readInfo(ph.page, '.minfo-dlg'), briefs.get(ph), `${w}×${h}: the dialog = the briefing`);
+      await assertBannedLayout(ph.page, '.minfo-dlg');
       const phStatus = await ph.page.$eval('[data-testid="match-info-status"]', (el) => el.textContent.trim());
       if (ph === last) assert.match(phStatus, /^轮到你决策\s*\d+s$/);
       else assert.equal(phStatus, '已选择「阿米娅」，等待其他博士');
@@ -373,7 +432,7 @@ describe('GitHub issue #8 item 1: 本局信息 in the strategy draft (real serve
       const bannedVisible = await ph.page.evaluate(() => {
         const body = document.querySelector('.minfo-dlg .modal__body').getBoundingClientRect();
         const g = document.querySelector('.minfo-dlg .brief-banned__grid').getBoundingClientRect();
-        return g.top >= body.top - 1 && g.bottom <= body.bottom + 1;
+        return g.top < body.bottom && g.bottom > body.top;
       });
       assert.ok(bannedVisible, `${w}×${h}: the banned operators scrolled into view`);
       await shot(ph.page, `coop-phone-dialog-${w}-scrolled`);
