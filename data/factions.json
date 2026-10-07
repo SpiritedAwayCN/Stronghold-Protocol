@@ -473,7 +473,7 @@
         "enemy_1112_emppnt": {
             "key": "enemy_1112_emppnt",
             "type": "FLY",
-            "weight": 10,
+            "weight": 5,
             "firstHalf": false,
             "fly": true,
             "N": [
@@ -496,7 +496,7 @@
         "enemy_1118_lidbox_2": {
             "key": "enemy_1118_lidbox_2",
             "type": "SPECIAL",
-            "weight": 10,
+            "weight": 5,
             "firstHalf": true,
             "fly": false,
             "N": [
@@ -550,7 +550,7 @@
         "enemy_1161_tidmag": {
             "key": "enemy_1161_tidmag",
             "type": "ELEMENT",
-            "weight": 10,
+            "weight": 5,
             "firstHalf": true,
             "fly": false,
             "N": [
@@ -568,7 +568,7 @@
         "enemy_1161_tidmag_2": {
             "key": "enemy_1161_tidmag_2",
             "type": "ELEMENT",
-            "weight": 10,
+            "weight": 5,
             "firstHalf": false,
             "fly": false,
             "N": [
@@ -863,7 +863,7 @@
         "enemy_1254_lypa_2": {
             "key": "enemy_1254_lypa_2",
             "type": "SPECIAL",
-            "weight": 10,
+            "weight": 5,
             "firstHalf": false,
             "fly": false,
             "N": [
@@ -1561,7 +1561,7 @@
         "enemy_10122_uacann_2": {
             "key": "enemy_10122_uacann_2",
             "type": "DOT",
-            "weight": 10,
+            "weight": 5,
             "firstHalf": false,
             "fly": false,
             "N": [
