@@ -42,7 +42,8 @@
 //   * Items: equip max 2 (a 3rd replaces the equipped item the player picks — g.equip replaceUid, the oldest when
 //     absent; equipped items are otherwise locked: g.destroy refuses them),
 //     2 identical normal items (hand/temp/equipped) merge into the golden item in the hand, items are never sold
-//     (destroy for 0). consume-on-equip items resolve through the effect registry and never take a slot.
+//     (destroy for 0). consume-on-equip items resolve through the effect registry and never take a slot — on a full
+//     carrier they still replace (destroy) one equipped item first, leaving a free slot (official).
 //   * Tokens (PRTS 卫戍协议/帮助 §战斗部署, user playtest #6): placing an owner with manually deployable summons
 //     (tokens.json `placeable`: 赫默's 医疗探机 and 巫恋's 诅咒娃娃 with their S2, 凯瑟琳's 爬行号·防护单元, 海嗣 / 狼群 /
 //     流形) sends one stack (deployLimit copies — 凯瑟琳 2) to the hand, placed by hand like any piece (no deploy slot);
@@ -1281,6 +1282,7 @@ export class PlayerState {
    * g.equip {itemUid, targetUid, replaceUid?}. A third item on a carrier with both slots used replaces the equipped item
    * the player picked in the replace dialog (`replaceUid`, research 09 §1.2 UseEquipUp.unloadInstId; absent ⇒ the
    * oldest); the replaced item is destroyed. A `replaceUid` that is not one of the target's equipped items is refused.
+   * consume-on-equip items replace the same way (the slot is then left free) — unless their effect refuses the target.
    */
   equip(itemUid, targetUid, replaceUid = null) {
     const g = this._gate(); if (g) return g;
@@ -1297,9 +1299,22 @@ export class PlayerState {
     if (consume) {
       const key = 'item:' + itemKey(item.id);
       if (!this.m.registry.has(key)) return fail(ERR.BAD_TARGET, 'effect not available');
+      // official: a full carrier still replaces first (the picked item, else the oldest, is destroyed) and the item is
+      // then consumed, leaving a free slot. Taken off before the effect, put back if the effect refuses the target.
+      target.items = target.items || [];
+      let replaced = null;
+      let replacedAt = -1;
+      if (target.items.length >= this.gd.equipPerChess) {
+        replacedAt = Math.max(0, replaceUid != null ? target.items.findIndex((x) => x.uid === replaceUid) : 0);
+        [replaced] = target.items.splice(replacedAt, 1);
+      }
       const ev = { item, target, golden: !!rec.isGolden, keep: false, error: null, consumed: true };
       this.m.dispatchItem(this, item, target, 'onEquip', ev);
-      if (ev.error) return fail(ERR[ev.error] ? ev.error : ERR.BAD_TARGET, typeof ev.detail === 'string' ? ev.detail : undefined);
+      if (ev.error) {
+        if (replaced) target.items.splice(replacedAt, 0, replaced);
+        return fail(ERR[ev.error] ? ev.error : ERR.BAD_TARGET, typeof ev.detail === 'string' ? ev.detail : undefined);
+      }
+      if (replaced) this.m.dispatchItem(this, replaced, target, 'onDestroy', { item: replaced, holder: target, reason: 'replace' });
       // the handler may have destroyed the target (信标) — resolve the item again
       const again = this.find(item.uid);
       if (again && again.area !== 'equipped') this._detach(again);

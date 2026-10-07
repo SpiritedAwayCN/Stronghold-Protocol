@@ -1307,10 +1307,6 @@ function equipCheck(ctx, itemPiece, targetPiece) {
   return { ok: true, action: 'equip' };
 }
 
-/** Whether equipping `itemId` attaches it (true) or consumes it on equip (false: no slot is used / replaced). */
-export function itemAttaches(item) {
-  return !(typeof item?.kind === 'string' && item.kind.startsWith('consume_on_equip'));
-}
 
 /**
  * Whether equipping item `uid` completes an item merge (an identical normal copy is owned elsewhere — hand, temp or
@@ -1369,10 +1365,13 @@ export function dropIntent(ctx, uid, target) {
   if (res.action === 'art') return { t: 'g.art', fields: { itemUid: uid, row: target.row, col: target.col } };
   if (res.action === 'equip') {
     const occ = target.area === 'hand' ? ctx.handAt.get(target.idx) : ctx.boardAt.get(tileKey(target.row, target.col));
-    // both slots used: the replace dialog picks the equipped item to destroy (g.equip replaceUid) — unless the item is
-    // consumed on equip, or it completes an item merge (the server merges it instead of equipping: nothing replaced)
-    const full = Array.isArray(occ?.piece?.items) && occ.piece.items.length >= 2
-      && itemAttaches(ctx.getItem(ctx.pieces.get(uid)?.piece?.id)) && !equipMerges(ctx, uid);
+    // both slots used: the replace dialog picks the equipped item to destroy (g.equip replaceUid) — consume-on-equip
+    // items too (official: the pick is destroyed, then the item is consumed, leaving a free slot) — unless it completes
+    // an item merge (the server merges it instead of equipping: nothing replaced), or it is a 博士投影 on an elite
+    // (refused by the server)
+    const rec = ctx.getItem(ctx.pieces.get(uid)?.piece?.id);
+    const refused = rec?.kind === 'consume_on_equip_or_delayed' && !!occ?.piece?.golden;
+    const full = Array.isArray(occ?.piece?.items) && occ.piece.items.length >= 2 && !refused && !equipMerges(ctx, uid);
     return { t: 'g.equip', fields: { itemUid: uid, targetUid: occ.piece.uid }, confirmReplace: full };
   }
   const to = target.area === 'hand' ? { area: 'hand', idx: target.idx } : { area: 'board', row: target.row, col: target.col };
