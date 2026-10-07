@@ -1744,8 +1744,9 @@ export function itemTarget(m, ps, item, ctx = context(m, ps)) {
   }
   const consume = typeof rec.kind === 'string' && rec.kind.startsWith('consume_on_equip');
   const list = byVal(deployed);
-  if (consume) return list[0] || owned[0] || null;
   const free = (p) => (p.items || []).length < gd.equipPerChess;
+  // a consumable on a full carrier destroys one of its items (official replace rule): a free carrier first
+  if (consume) return list.find(free) || owned.find(free) || list[0] || owned[0] || null;
   if (rec.requiresBondId) {
     const member = list.find((p) => free(p) && (chessRec(m, p.id)?.bonds || []).includes(rec.requiresBondId));
     if (member) return member;
