@@ -3665,6 +3665,7 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
   return {
     season: SEASON,
     seasonName: '卫戍协议：盟约',
+    ulpiaTraitVersion: 'modified',
     modes,
     economy: {
       income: Array.from({ length: 16 }, (_, r) => (r === 0 ? 0 : Math.min(3 + r, incomeCap))),

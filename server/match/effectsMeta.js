@@ -276,10 +276,10 @@ export class EffectDispatcher {
   }
 
   /** Hooks a garrison handler runs on: its eventType's hook, or what `handler.garrisonHooks(garrison)` returns. */
-  _garrisonHooks(h, g) {
+  _garrisonHooks(h, g, gd) {
     if (typeof h.garrisonHooks === 'function') {
       try {
-        const list = h.garrisonHooks(g);
+        const list = h.garrisonHooks(g, gd);
         if (Array.isArray(list) && list.length) return list;
       } catch (e) { this._report(`garrison:${g.effectKey}`, 'garrisonHooks', e); }
     }
@@ -301,7 +301,7 @@ export class EffectDispatcher {
         if (!g) continue;
         const key = `garrison:${g.effectKey}`;
         const h = this.registry.get(key);
-        if (!h || !this._garrisonHooks(h, g).includes(hook)) continue;
+        if (!h || !this._garrisonHooks(h, g, gd).includes(hook)) continue;
         if (where === 'hand' && g.bbStr && g.bbStr.conditionkey === 'character_target_inboard') continue;
         const repeat = hook === 'onGain' ? this.investRepeat(ps) : 1;
         this._call(ps, key, h, hook, { kind: 'garrison', key, piece, garrisonId: gid, garrison: g, bb: g.bb || {}, bbStr: g.bbStr || {}, where }, ev, repeat);
@@ -343,10 +343,10 @@ export class EffectDispatcher {
     try {
       for (const gid of rec.garrisonIds) {
         const g = gd.garrison(gid);
-        if (!g || g.eventType !== eventType) continue;
+        if (!g) continue;
         const key = `garrison:${g.effectKey}`;
         const h = this.registry.get(key);
-        if (!h) continue;
+        if (!h || (g.eventType !== eventType && !this._garrisonHooks(h, g, gd).includes(hook))) continue;
         const ev = hook === 'onGain' ? { piece: self, kind: 'chess', source: 'trigger' }
           : hook === 'onSold' ? { piece: self, gain: 0 }
           : hook === 'onRefresh' ? { slots: ps.shop.slots, free: true, price: 0, trigger: true }

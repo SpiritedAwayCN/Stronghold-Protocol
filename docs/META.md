@@ -373,7 +373,7 @@ piece gained or equipped meanwhile waits for the next dispatch, and an item move
 
 ### 2.3 Garrisons (特质)
 The dispatcher calls `handler[hook] ?? handler.run` only on the hook of the garrison's `eventType` (a handler may widen
-that per garrison with `garrisonHooks(garrison) → hook[]`, e.g. "<进入休整期时><休整期结束时>"):
+that per garrison with `garrisonHooks(garrison, gd) → hook[]`, e.g. "<进入休整期时><休整期结束时>"):
 
 | eventType | hook | whose garrisons |
 |---|---|---|
@@ -384,6 +384,8 @@ that per garrison with `garrisonHooks(garrison) → hook[]`, e.g. "<进入休整
 | `SERVER_CHESS_SOLD` 售出时 | `onSold` | the sold piece |
 | `SERVER_PRICE` 购买价格 | `onPrice` (first) | the chess in the priced slot (`ctx.source.where === 'shop'`); SERVER_CHESS_PRICE `bb.price` is the discount off the tier price (至简 3 − 2 = 1, 红豆 2 − 1 = 1: both texts say 购买价格为1) |
 | `IN_BATTLE` | — | battle side (server/sim/content/garrisons.js `install`) |
+
+`garrison_12_a/b` (乌尔比安) has a project override controlled by `data/config.json → ulpiaTraitVersion`. `modified` maps it to `onGain` and grants one / two normal 阿戈尔重刃; `original` keeps the data's original IN_BATTLE attack bonus. The override uses the same onGain repeat rules as other garrisons, including 投资人.
 
 ```js
 // garrisons.js — "<获得时>获得等于当前调度中心等级的【炎】层数（无需激活盟约）"  (SERVER_ADD_BOND_METHOD, add_method shoplv)

@@ -1,6 +1,7 @@
 {
     "season": "act2autochess",
     "seasonName": "卫戍协议：盟约",
+    "ulpiaTraitVersion": "modified",
     "modes": {
         "mode_training_1": {
             "modeId": "mode_training_1",

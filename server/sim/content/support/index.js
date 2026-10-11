@@ -42,6 +42,7 @@ export function gameData() {
   }
   return DATA;
 }
+export const modifiedUlpiaTrait = (data = gameData()) => data?.config?.ulpiaTraitVersion === 'modified';
 /** Tests only: swap the data object (null → reload the singleton). Also drops derived caches. */
 export function setGameData(d) { DATA = d ?? null; CORE = null; }
 
