@@ -183,15 +183,23 @@ test('Final Assault leaks cost their lpr from the merged LP', () => {
   m.dispose();
 });
 
-test('Hidden Core: Σ activated layers (end of the boss prep) > 1200 and team LP > 1 after a win → R15 prep → HIDDEN_CORE', () => {
-  const h = makeMatch({ mode: 'coop', difficulty: 'NORMAL', humans: 2, seed: 52, fake: true, script: (b) => (b.kind === 'boss' || b.kind === 'hidden' ? { bossDps: 1e9 } : {}) }).start();
+test('Hidden Core: co-op Σ activated layers > 350 and team LP > 1 after a win → R15 prep → HIDDEN_CORE', () => {
+  const data = {
+    ...DATA,
+    config: { ...DATA.config, hiddenCore: { ...DATA.config.hiddenCore, multi: 350 } },
+  };
+  const h = makeMatch({ mode: 'coop', difficulty: 'NORMAL', humans: 2, seed: 52, fake: true, data, script: (b) => (b.kind === 'boss' || b.kind === 'hidden' ? { bossDps: 1e9 } : {}) }).start();
   const m = h.m;
   assert.equal(m.gd.hiddenRound, 15);
   assert.ok(m.hiddenBossId && ['boss_8', 'boss_9', 'boss_10'].includes(m.hiddenBossId));
   h.drive(() => m.phase === PHASE.PREP && m.round === 14);
-  for (const p of m.players.values()) { p.bondCountBonus.yanShip = 3; p.layers.yanShip = 601; p.recompute(); }
+  for (const [i, p] of [...m.players.values()].entries()) {
+    p.bondCountBonus.yanShip = 3;
+    p.layers.yanShip = i === 0 ? 176 : 175;
+    p.recompute();
+  }
   h.drive(() => m.phase === PHASE.FINAL_ASSAULT);
-  assert.equal(m.hiddenLayerSum, 1202);
+  assert.equal(m.hiddenLayerSum, 351);
   h.drive(() => m.phase === PHASE.PREP && m.round === 15);
   assert.equal(m.phase, PHASE.PREP);
   assert.ok(m.deadline > 0, 'R15 prep is timed in co-op');
@@ -210,10 +218,14 @@ test('Hidden Core: Σ activated layers (end of the boss prep) > 1200 and team LP
   m.dispose();
 });
 
-test('Hidden Core is skipped at Σ layers ≤ threshold, on FUNNY, or with team LP ≤ 1; a failed hidden core keeps the clear', () => {
-  const gd = new GameData(DATA, 'mode_multi_normal');
-  assert.equal(hiddenEligible(gd, { layerSum: 1200, teamLp: 50 }), false);
-  assert.equal(hiddenEligible(gd, { layerSum: 1201, teamLp: 50 }), true);
+test('Hidden Core uses a >350 layer threshold in co-op; it is skipped on FUNNY or with team LP ≤ 1, and a failed hidden core keeps the clear', () => {
+  const data = {
+    ...DATA,
+    config: { ...DATA.config, hiddenCore: { ...DATA.config.hiddenCore, multi: 350 } },
+  };
+  const gd = new GameData(data, 'mode_multi_normal');
+  assert.equal(hiddenEligible(gd, { layerSum: 350, teamLp: 50 }), false);
+  assert.equal(hiddenEligible(gd, { layerSum: 351, teamLp: 50 }), true);
   assert.equal(hiddenEligible(gd, { layerSum: 5000, teamLp: 1 }), false);
   assert.equal(hiddenEligible(new GameData(DATA, 'mode_single_hard'), { layerSum: 351, teamLp: 2 }), true);
   assert.equal(hiddenEligible(new GameData(DATA, 'mode_single_hard'), { layerSum: 350, teamLp: 2 }), false);

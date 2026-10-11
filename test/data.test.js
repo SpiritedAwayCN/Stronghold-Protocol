@@ -276,7 +276,7 @@ test('config: modes, rounds and templates', () => {
   assert.equal(config.economy.coopPoolMultiplier, 2);
   assert.equal(config.economy.itemPoolCopiesOverrides.chess_item_5_07_e_a, 2);
   assert.deepEqual(config.hiddenCore.single, 350);
-  assert.deepEqual(config.hiddenCore.multi, 1200);
+  assert.deepEqual(config.hiddenCore.multi, 350);
   assert.equal(config.titles.length, 6);
 });
 

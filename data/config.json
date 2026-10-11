@@ -3912,7 +3912,7 @@
     },
     "hiddenCore": {
         "single": 350,
-        "multi": 1200,
+        "multi": 350,
         "minTeamLpExclusive": 1,
         "difficulties": [
             "NORMAL",
