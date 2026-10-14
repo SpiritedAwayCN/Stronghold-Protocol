@@ -14,6 +14,7 @@
 import { getConfig, getMode } from '../data.js';
 import { isShopItem } from '../sim/simdata.js';
 import { standInRecord } from '../../shared/standIn.js';
+import { applyRosterVariant } from '../../shared/rosterVariant.js';
 
 const own = (map, id) => (map && typeof map === 'object' && typeof id === 'string' && Object.hasOwn(map, id) && map[id] && typeof map[id] === 'object' ? map[id] : null);
 const numOr = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -92,7 +93,7 @@ export class GameData {
    * @param {string} modeId e.g. 'mode_multi_hard'
    */
   constructor(data, modeId) {
-    this.raw = data && typeof data === 'object' ? data : {};
+    this.raw = applyRosterVariant(data && typeof data === 'object' ? data : {});
     this.config = getConfig(this.raw) || {};
     this.modeId = modeId;
     this.mode = getMode(modeId, this.raw) || {};

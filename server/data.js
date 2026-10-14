@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyRosterVariant } from '../shared/rosterVariant.js';
 
 /** Repository root (…/Stronghold-Protocol). */
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -77,7 +78,7 @@ export function loadData(dir = DATA_DIR, { log = console, expected = DATA_FILES 
   }
   const missing = expected.filter((k) => !(k in out));
   if (missing.length) log.warn(`[data] missing data files: ${missing.map((k) => k + '.json').join(', ')}`);
-  return deepFreeze(out);
+  return deepFreeze(applyRosterVariant(out));
 }
 
 /** @type {Readonly<Record<string, any>> | null} */

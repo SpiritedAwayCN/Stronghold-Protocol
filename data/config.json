@@ -4521,5 +4521,6 @@
                 "textRaw": "<@ping.high>{0}</>ms"
             }
         ]
-    }
+    },
+    "clemntRosterVersion": "modified"
 }

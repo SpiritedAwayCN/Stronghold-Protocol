@@ -44,6 +44,7 @@ import { atPotential, isPotential, POTENTIAL_DEFAULT, cultivateMul } from '../..
 import { standInRecord } from '../../shared/standIn.js';
 import { diyRecordOf, diyTokenOwner } from '../../shared/diy.js';
 import { normHitArea } from './body.js';
+import { applyRosterVariant } from '../../shared/rosterVariant.js';
 
 // ---------------------------------------------------------------------------------------------------------------
 // generic helpers
@@ -558,6 +559,7 @@ export function freezeDef(d) {
  */
 export class DataSource {
   constructor(raw = {}, fallback = null) {
+    raw = applyRosterVariant(raw);
     this.raw = {
       chess: asMap(unwrap(raw.chess, 'chess'), 'chessId') ?? {},
       enemies: asMap(unwrap(raw.enemies, 'enemies'), 'key') ?? {},
@@ -818,7 +820,7 @@ export function getDefaultSource() {
  * @param {object} data
  */
 export function setSimData(data) {
-  generatedCache = data && typeof data === 'object' ? data : null;
+  generatedCache = data && typeof data === 'object' ? applyRosterVariant(data) : null;
   injected = true;
   defaultSource = null;
   return getDefaultSource();

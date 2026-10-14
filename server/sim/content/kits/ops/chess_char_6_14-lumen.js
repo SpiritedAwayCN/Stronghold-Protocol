@@ -123,4 +123,5 @@ function lumen(bb, chess, def) {
 
 export default {
   chess_char_6_14_a: lumen,
+  char_4042_lumen: lumen,
 };

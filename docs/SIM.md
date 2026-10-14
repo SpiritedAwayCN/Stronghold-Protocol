@@ -7,6 +7,11 @@ the profession defaults and the test harness. Everything here is deterministic: 
 and the only floating-point functions are correctly rounded ones (`detmath.js` below), so a battle gives the same bits in
 every browser and on the server.
 
+The optional `clemntRosterVersion` roster (DATA.md §1) is applied both by `DataSource` and `setSimData`. 克莱门莎's
+new garrison reuses the existing `attrByBond` reader, including active-bond filtering, combined-layer floor division
+and layer-gain refresh; Sharp inherits it when fielded as her backup. 流明's existing kit is also registered by charId
+for DIY picks, with all three skills and no DIY garrison.
+
 ```
 server/sim/
   Battle.js        one field (normal / unite / boss / hidden) — the class: constructor, method install, public API

@@ -1,4 +1,5 @@
 {
+  "【阿戈尔】【迅捷】每叠加2层，本干员攻击力+{percent}%": "For every 2 combined layers of [Aegir] and [Swift], this operator gains +{percent}% ATK",
   "_meta": {
     "type": "lang",
     "lang": "en",
