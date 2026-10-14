@@ -30,6 +30,7 @@
 import { useEffect, useReducer } from '../vendor/hooks.module.js';
 import { applyFileOverlay } from '../../shared/i18nData.js';
 import { canonicalLang } from '../../shared/i18nPacks.js';
+import { applyRosterVariant } from '../../shared/rosterVariant.js';
 
 /** Known data files (name → URL basename). Unknown names are allowed too (`/data/<name>.json`). */
 export const DATA_FILES = Object.freeze({
@@ -120,7 +121,7 @@ const transientFailure = (err) => {
  * user playtest #3 item 9); a transient failure is retried (RETRY_DELAYS_MS) while the file stays 'loading', so a
  * network hiccup does not leave the texts of a whole session missing. `local` and `assets` are reported `missing` on
  * the first failure or timeout (the emote glyph) and stay that way through a retry; a later success is `ready`.
- * @param {{ fetch?: typeof fetch, base?: string, retryDelays?: number[], wait?: (ms: number) => Promise<void>, timeoutMs?: number, setTimeout?: typeof setTimeout, clearTimeout?: typeof clearTimeout }} [opts]
+ * @param {{ fetch?: typeof fetch, base?: string, retryDelays?: number[], wait?: (ms: number) => Promise<void>, timeoutMs?: number, setTimeout?: typeof setTimeout, clearTimeout?: typeof clearTimeout, rosterRules?: boolean }} [opts]
  *   `timeoutMs` 0 turns the art-manifest clock off. `setTimeout` / `clearTimeout` let a test fire that clock.
  */
 export function createDataStore(opts = {}) {
@@ -203,6 +204,13 @@ export function createDataStore(opts = {}) {
       for (let attempt = 0; ; attempt++) {
         try {
           entry.value = await readJson(name);
+          if (opts.rosterRules && ['chess', 'backups', 'garrisons', 'bonds'].includes(name)) {
+            const config = await load('config');
+            if (config?.clemntRosterVersion === 'modified') {
+              const backups = name === 'backups' ? entry.value : await load('backups');
+              entry.value = applyRosterVariant({ config, backups, [name]: entry.value })[name];
+            }
+          }
           entry.status = 'ready';
           break;
         } catch (err) {
@@ -400,7 +408,7 @@ export function createDataStore(opts = {}) {
 }
 
 /** Browser data store singleton. */
-export const data = createDataStore();
+export const data = createDataStore({ rosterRules: true });
 
 /** @param {...string} names @returns {Promise<any[]>} */
 export const loadData = (...names) => data.loadAll(...names);

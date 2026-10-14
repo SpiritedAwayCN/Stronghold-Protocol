@@ -26,13 +26,13 @@ const SARIA = 'chess_char_5_11_a'; // 塞雷娅 (NORMAL, MELEE) → Touch S3 + P
 const CATHY = 'chess_char_4_11_a'; // 凯瑟琳 (PRESET): never droppable
 const INSIDE = 'chess_char_1_01_a'; // 隐现 (PRESET) with a loadout choice
 
-test('droppable chess = the 55 NORMAL base chess; checkNotOwned keeps those, drops the rest; the wire validator is structural', () => {
+test('droppable chess includes the new NORMAL Clement; checkNotOwned keeps those, drops the rest; the wire validator is structural', () => {
   const all = Object.values(DATA.chess);
   const drop = all.filter(isDroppableChess);
-  assert.equal(drop.length, 55);
+  assert.equal(drop.length, 56);
   assert.ok(drop.every((c) => c.chessType === 'NORMAL' && !c.isGolden && c.backup.charId !== c.charId));
   assert.equal(all.filter((c) => c.chessType === 'PRESET' && isDroppableChess(c)).length, 0, 'PRESET always fields its own operator');
-  assert.equal(drop.filter((c) => c.visible).length, 53, '53 in this season\'s shop (2 retired forms are hidden)');
+  assert.equal(drop.filter((c) => c.visible).length, 54, '54 in the modified roster (2 retired forms are hidden)');
   const res = checkNotOwned([SARIA, SILVER, SILVER, CATHY, chess(SILVER).goldenId, 'chess_char_9_99_a', 'chess_diy_5_1_a', MLYSS], chess);
   assert.deepEqual(res, { ok: true, notOwned: [SILVER, SARIA, MLYSS].sort(), dropped: 5 });
   assert.deepEqual(checkNotOwned([], chess), { ok: true, notOwned: [], dropped: 0 });

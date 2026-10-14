@@ -47,20 +47,20 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const RESEARCH_DIR = join(ROOT, 'docs', 'research');
 const GAMEDATA_URL = 'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/';
 const SEASON = 'act2autochess';
-const USAGE = 'usage: node tools/build-data.mjs [--refresh | --offline] [--out <dir>] [--cache <dir>] [--report <file>] [--quiet] [--no-research] [--force]';
+const USAGE = 'usage: node tools/build-data.mjs [--refresh | --offline] [--out <dir>] [--cache <dir>] [--report <file>] [--quiet] [--no-research] [--force] [--roster-only]';
 
 /**
  * Parse the command line strictly (unknown options and missing values are errors, so a typo can
  * never silently write data somewhere unexpected).
  * @param {string[]} argv
- * @returns {{refresh:boolean, offline:boolean, quiet:boolean, noResearch:boolean, force:boolean, out:string, cache:string, report:string}}
+ * @returns {{refresh:boolean, offline:boolean, quiet:boolean, noResearch:boolean, force:boolean, rosterOnly:boolean, out:string, cache:string, report:string}}
  */
 function parseArgs(argv) {
   const opts = {
-    refresh: false, offline: false, quiet: false, noResearch: false, force: false,
+    refresh: false, offline: false, quiet: false, noResearch: false, force: false, rosterOnly: false,
     out: join(ROOT, 'data'), cache: join(ROOT, '.cache', 'gamedata'), report: join(ROOT, '.cache', 'build-data-report.json'),
   };
-  const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force' };
+  const flags = { '--refresh': 'refresh', '--offline': 'offline', '--quiet': 'quiet', '--no-research': 'noResearch', '--force': 'force', '--roster-only': 'rosterOnly' };
   const dirs = { '--out': 'out', '--cache': 'cache', '--report': 'report' };
   for (let i = 0; i < argv.length; i++) {
     const [name, inline] = argv[i].includes('=') ? [argv[i].slice(0, argv[i].indexOf('=')), argv[i].slice(argv[i].indexOf('=') + 1)] : [argv[i], null];
@@ -1370,9 +1370,13 @@ function buildBackups(ctx, chess) {
   for (const t of DIY_EXCLUDED_TEAMS) if (!excluded.some((id) => teamsOf(charTable[id]).includes(t))) warn(`DIY_EXCLUDED_TEAMS: no owned-6★ pick of team ${t}`);
   const ownedPool = legal6.filter((id) => !excluded.includes(id));
   for (const id of ownedPool) for (const st of diyStatuses.values()) addNeed(id, st);
+  // Keep both roster versions available without rebuilding when the host changes the config switch.
+  const alternateOwned = ['char_4042_lumen', 'char_4231_clemnt'];
+  for (const id of alternateOwned) for (const st of diyStatuses.values()) addNeed(id, st);
+  for (const suffix of ['a', 'b']) addNeed('char_4231_clemnt', chess[`chess_char_6_14_${suffix}`].status);
 
   const units = {};
-  for (const id of [...standInIds, ...ownedPool]) {
+  for (const id of [...new Set([...standInIds, ...ownedPool, ...alternateOwned])]) {
     const unit = buildUnitHead(ctx, id);
     unit.standsIn = (standsIn.get(id) || []).sort(naturalCmp);
     unit.forms = {};
@@ -1402,6 +1406,44 @@ function buildBackups(ctx, chess) {
     };
   }
   return { units, tokens, diy: { slots, prototypes, locked, ownedPool, excluded, operators } };
+}
+
+function buildRosterVariant(backups, chess, garrisons) {
+  const charId = 'char_4231_clemnt';
+  const unit = backups.units[charId];
+  const records = {}, traits = {};
+  for (const suffix of ['a', 'b']) {
+    const id = `chess_char_6_clemnt_${suffix}`;
+    const gid = `garrison_clemnt_${suffix}`;
+    const identity = {
+      ...chess[`chess_char_6_14_${suffix}`],
+      chessId: id, baseId: 'chess_char_6_clemnt_a', goldenId: 'chess_char_6_clemnt_b',
+      upgradeChessId: suffix === 'a' ? 'chess_char_6_clemnt_b' : null,
+      chessType: 'NORMAL',
+      bonds: ['egirShip', 'swiftShip'], garrisonIds: [gid],
+      backup: { ...chess.chess_char_6_06_a.backup },
+    };
+    const form = unitForm(backups, charId, identity.status);
+    if (!form) throw new Error(`Missing Clement form ${statusKey(identity.status)}`);
+    records[id] = composeUnitRecord(identity, unit, form, { skillIndex: 1 });
+    const rate = suffix === 'a' ? 1 : 2;
+    traits[gid] = {
+      ...garrisons[`garrison_05_${suffix}`], garrisonId: gid,
+      desc: `【阿戈尔】【迅捷】每叠加2层，本干员攻击力+${rate}%`,
+      descRaw: `【阿戈尔】【迅捷】每叠加2层，本干员攻击力<@ba.vup>+${rate}%</>`,
+      bb: { divide_num: 2, atk: rate / 100 },
+      bbStr: { key: 'act1autochess_gar_eff_attrByBond', bond_id: 'egirShip,swiftShip' },
+      owners: [id],
+    };
+  }
+  const lumen = backups.units.char_4042_lumen;
+  return {
+    chess: records, garrisons: traits,
+    lumenOperator: {
+      name: lumen.name, rarity: lumen.rarity, profession: lumen.profession, subProfessionId: lumen.subProfessionId,
+      obtainable: true, powers: [], bonds: ['emptyShip'],
+    },
+  };
 }
 
 /**
@@ -3666,6 +3708,7 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
     season: SEASON,
     seasonName: '卫戍协议：盟约',
     ulpiaTraitVersion: 'modified',
+    clemntRosterVersion: 'modified',
     modes,
     economy: {
       income: Array.from({ length: 16 }, (_, r) => (r === 0 ? 0 : Math.min(3 + r, incomeCap))),
@@ -3838,6 +3881,10 @@ function attachPotential(passes) {
     const vals = passes.map((p) => p.chess[id]);
     if (vals.some((v) => !v)) { errors.push(`potential chess ${id}: missing at a rank`); continue; }
     full.chess[id] = withPotentialData(vals, `chess ${id}`, errors);
+  }
+  for (const id of Object.keys(full.backups.rosterVariant.chess)) {
+    full.backups.rosterVariant.chess[id] = withPotentialData(
+      passes.map(p => p.backups.rosterVariant.chess[id]), `roster variant ${id}`, errors);
   }
   for (const [charId, unit] of Object.entries(full.backups.units)) {
     for (const key of Object.keys(unit.forms)) {
@@ -4081,6 +4128,7 @@ async function main() {
   const effects = buildEffects(ctx);
   const bonds = buildBonds(ctx, chess, effects);
   const garrisons = buildGarrisons(ctx, chess);
+  for (const p of passes) p.backups.rosterVariant = buildRosterVariant(p.backups, p.chess, garrisons);
   const items = buildItems(ctx, effects);
   const bands = buildBands(ctx, effects);
   const enemies = buildEnemies(ctx);
@@ -4113,7 +4161,19 @@ async function main() {
   const write = !errors.length || OPTS.force;
   if (write) {
     await mkdir(OPTS.out, { recursive: true });
-    for (const [name, text] of Object.entries(texts)) {
+    let outputs = texts;
+    if (OPTS.rosterOnly) {
+      const previous = await readFile(join(OPTS.out, 'config.json'), 'utf8');
+      const indent = previous.match(/\n([ \t]+)"/)?.[1] ?? null;
+      outputs = {
+        config: JSON.stringify({
+          ...JSON.parse(previous),
+          clemntRosterVersion: config.clemntRosterVersion,
+        }, null, indent) + (previous.endsWith('\n') ? '\n' : ''),
+        backups: texts.backups,
+      };
+    }
+    for (const [name, text] of Object.entries(outputs)) {
       // Atomic per file: a crash mid-write never leaves a truncated JSON behind.
       const dest = join(OPTS.out, `${name}.json`);
       const tmp = `${dest}.tmp-${process.pid}`;
@@ -4139,7 +4199,7 @@ async function main() {
   await mkdir(dirname(OPTS.report), { recursive: true });
   await writeFile(OPTS.report, JSON.stringify(report, null, 2));
 
-  if (write) log(`wrote ${Object.keys(files).length} files to ${OPTS.out} (${(total / 1024 / 1024).toFixed(2)} MB) in ${Date.now() - t0} ms`);
+  if (write) log(`wrote ${OPTS.rosterOnly ? 2 : Object.keys(files).length} files to ${OPTS.out} (${(total / 1024 / 1024).toFixed(2)} MB) in ${Date.now() - t0} ms`);
   else console.error(`integrity errors: ${OPTS.out} left unchanged (re-run with --force to write anyway)`);
   log(Object.entries(report.counts).map(([k, v]) => `${k}=${v}`).join(' '));
   if (warnings.length) {

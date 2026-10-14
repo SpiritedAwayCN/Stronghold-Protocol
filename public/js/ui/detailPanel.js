@@ -319,6 +319,11 @@ export function garrisonTypeIconKey(garrison) {
 export function GarrisonBlock({ garrison, m }) {
   useData('config', 'items');
   let shown = garrison;
+  if (garrison.garrisonId === 'garrison_clemnt_a' || garrison.garrisonId === 'garrison_clemnt_b') {
+    const percent = garrison.garrisonId === 'garrison_clemnt_b' ? 2 : 1;
+    const desc = t('【阿戈尔】【迅捷】每叠加2层，本干员攻击力+{percent}%', { percent });
+    shown = { ...garrison, desc, descRaw: desc };
+  }
   if (data.get('config')?.ulpiaTraitVersion === 'modified'
     && (garrison.garrisonId === 'garrison_12_a' || garrison.garrisonId === 'garrison_12_b')) {
     const count = garrison.garrisonId === 'garrison_12_b' ? 2 : 1;
@@ -896,4 +901,3 @@ export function DetailPanel({ detail, editable, snapHp, onClose, onSell, onDestr
     </div>
   </aside>`;
 }
-

@@ -181,13 +181,17 @@ export const TIER_KITS = Object.freeze(MODULES.map((group) => Object.assign({}, 
 export const STANDIN_KITS = Object.freeze(Object.assign({}, ...STANDIN_MODULES.map(registryOf)));
 
 /** The 自选 operator kits: owned-6★ charId → kit builder, in OPERATOR_KIT_FILES order. */
-export const OPERATOR_KITS = Object.freeze(Object.assign({}, ...OPERATOR_MODULES.map(registryOf)));
+export const OPERATOR_KITS = Object.freeze(Object.assign({}, ...OPERATOR_MODULES.map(registryOf), {
+  char_4042_lumen: TIER_KITS[5].char_4042_lumen,
+}));
 
 /**
  * The merged kit registry: baseChessId → (bb, chess, def) => Kit, tier 1 … tier 6, then the stand-ins' charIds, then
  * the 自选 operators' charIds.
  */
-export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS));
+export const KITS = Object.freeze(Object.assign({}, ...TIER_KITS, STANDIN_KITS, OPERATOR_KITS, {
+  chess_char_6_clemnt_a: OPERATOR_KITS.char_4231_clemnt,
+}));
 
 /**
  * Every character a 自选 pick may field with a faithful kit: the 预备干员 (GENERIC_KIT_CHARS), the stand-ins with a kit

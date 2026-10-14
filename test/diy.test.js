@@ -48,7 +48,7 @@ test('diyPool: tier 5 = 15 prototypes + 72 owned 6★, tier 6 = 9 + 72; no prese
   assert.deepEqual(GENERIC_KIT_CHARS.filter((id) => prototypes['5'].includes(id)), RESERVES5);
   for (const id of ELITES) assert.equal(typeof STANDIN_KITS[id], 'function', `${id}: stand-in kit`);
   const ops = ownedPool.filter((id) => typeof OPERATOR_KITS[id] === 'function');
-  assert.deepEqual([...ops].sort(), Object.keys(OPERATOR_KITS).sort(), 'every operator kit is an owned-6★ pick');
+  assert.deepEqual([...ops, 'char_4042_lumen'].sort(), Object.keys(OPERATOR_KITS).sort(), 'operator kits cover the original picks and the optional Lumen pick');
   assert.deepEqual(diyPool(5, { data: DATA, kitted: KITTED_CHARS }), [...RESERVES5, ...ELITES, ...ops]);
   assert.deepEqual(diyPool(6, { data: DATA, kitted: KITTED_CHARS }), [...ELITES, ...ops]);
   assert.deepEqual(diyPool(6, { data: DATA, kitted: (id) => id === SIEGE }), [SIEGE], 'a predicate works too');

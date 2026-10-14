@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildBattleSpec, createBattleFromSpec, resultDigest } from '../../server/sim/spec.js';
 import { DataSource, getDefaultSource } from '../../server/sim/simdata.js';
+import { getData } from '../../server/data.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -69,5 +70,46 @@ describe('operator loadouts in the browser sim', { skip }, () => {
     assert.equal(nodeUnits[2][1], 'skchr_mlyss_2');
     assert.equal(nodeUnits[3][1], 'sktok_mlyss_wtrman_2');
     assert.equal(out.hash, nodeHash, 'browser and Node results are identical');
+  });
+
+  test('configured Clement normal / elite / backup and Lumen DIY survive browser battle entry', async () => {
+    const data = getData();
+    assert.equal(data.config.clemntRosterVersion, 'modified');
+    const ds = new DataSource(data, null);
+    const spec = buildBattleSpec({
+      battleId: 'roster1', fieldId: 'n:p1', kind: 'normal', seed: 90211, modeId: 'mode_multi_normal',
+      round: 3, stageId: 'act2autochess_m01', timeLimit: 30,
+      players: [{ playerId: 'p1', seat: 0, side: 'L', colOffset: 0, bonds: {}, units: [
+        { uid: 1, chessId: 'chess_char_6_clemnt_a', row: 10, col: 3 },
+        { uid: 2, chessId: 'chess_char_6_clemnt_b', row: 11, col: 4 },
+        { uid: 3, chessId: 'chess_char_6_clemnt_a', standIn: true, row: 12, col: 5 },
+        { uid: 4, chessId: 'chess_char_6_diy1_a', diy: { charId: 'char_4042_lumen', skillIndex: 1 }, row: 9, col: 6 },
+      ] }],
+    });
+    const nb = createBattleFromSpec(spec, ds, { quiet: true });
+    nb.step();
+    const nodeUnits = nb.allyUnits.map(u => [u.uid, u.def.charId, u.def.skill?.id, u.deployed]);
+    assert.equal(nodeUnits.length, 4);
+    assert.ok(nodeUnits.every(u => u[3]));
+    const page = await browser.newPage();
+    try {
+      await page.goto(`http://127.0.0.1:${srv.port}/sim/spec.js`);
+      const out = await page.evaluate(async s => {
+        const { loadBrowserSim } = await import('/js/battle/runner.js');
+        const { spec: S, ds } = await loadBrowserSim();
+        const b = S.createBattleFromSpec(s, ds, { quiet: true });
+        b.step();
+        return {
+          units: b.allyUnits.map(u => [u.uid, u.def.charId, u.def.skill?.id, u.deployed]),
+          errors: b.errors,
+          hash: S.resultDigest(b.runToEnd(100)).hash,
+        };
+      }, spec);
+      assert.deepEqual(out.units, nodeUnits, 'every prepared operator is deployed with the server-identical definition');
+      assert.deepEqual(out.errors, []);
+      assert.equal(out.hash, resultDigest(nb.runToEnd(100)).hash);
+    } finally {
+      await page.close();
+    }
   });
 });

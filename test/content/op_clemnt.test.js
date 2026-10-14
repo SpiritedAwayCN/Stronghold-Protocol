@@ -5,6 +5,7 @@ import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.
 import { KITTED_CHARS } from '../../server/sim/content/kits/index.js';
 import { diyPool } from '../../shared/diy.js';
 import { performAttack, effectiveProfile } from '../../server/sim/ai.js';
+import { DataSource } from '../../server/sim/simdata.js';
 const C = 'char_4231_clemnt';
 const data = Object.fromEntries(['chess', 'backups'].map((f) => [f, JSON.parse(readFileSync(new URL(`../../data/${f}.json`, import.meta.url)))]));
 const approx = (a, b, label = '') => assert.ok(Math.abs(a - b) < 1e-5 * Math.max(1, Math.abs(b)), `${label}: ${a} != ${b}`);
@@ -13,6 +14,7 @@ const defs = { enemies: { dummy: enemy('dummy'), light: enemy('light', { mass: 3
   fly: enemy('fly', { motion: 'FLY' }), zero: enemy('zero', { mass: 0 }), armored: enemy('armored', { def: 100 }) } };
 function field({ tier = 6, elite = true, skill = 0, potential = 6, dir = 'RIGHT', row = 10, col = 3, flags = {} } = {}) {
   const h = makeBattle({ seed: 23, autoFinish: false, timeLimit: 180, defs, flags,
+    data: new DataSource({ ...data, ...defs }),
     hooks: ['damaged', 'attack', 'elementBurst', 'ammoUsed'], captureNoisy: true,
     units: [{ uid: 1, diy: { slot: tier, charId: C, skillIndex: skill }, elite, potential, row, col, dir }] });
   h.step(); return { h, u: h.unit(1) };

@@ -85,6 +85,14 @@ A registry mapping **effect keys** → handler objects `{ onRoundStart, onPrepEn
 
 The project-specific `data/config.json → ulpiaTraitVersion` override defaults to `modified` in newly generated data: 乌尔比安 gains one 阿戈尔重刃 on acquisition (精锐: two) and loses his original IN_BATTLE 阿戈尔 attack bonus. `original` retains the old trait; an absent/unknown value also means original for existing installs.
 
+The independent `clemntRosterVersion` switch defaults to `modified`: 克莱门莎 replaces 流明 in the tier-6 pool as a
+NORMAL operator (default S2 风暴潮, Sharp backup following the existing tier-6 guard rule). Her bonds are 阿戈尔 and
+迅捷; her IN_BATTLE trait uses 圣聆初雪's algorithm: floor((active 阿戈尔 layers + active 迅捷 layers) / 2) × 1% ATK
+(elite: 2%), a direct stat bonus refreshed on layer gains. The backup inherits these bonds and this trait.
+流明 becomes a tier-5 / tier-6 DIY pick with 协防 and no trait. `original`, or a missing / unknown key, retains the
+original roster. This is an explicit maintainer-requested deviation from the official roster (2026-10-14), not an
+official seasonal update.
+
 ### 6.5 Waves (waves.js)
 
 Per match: pick stage (weighted among the mode's `config.modes[m].stages`, weight 50 each: 标准 FUNNY = 战场#01 `act1autochess_m01` only, 险境 NORMAL = 8 stages, 绝境 / 终极 = 7 without 战场#01 — `waves.js setupMatchWaves`, `test/match/stagepick.test.js`), 3 of 6 typed enemy factions, disabled bond set (3 core + 4 add-on for NORMAL+, per research), boss (weighted), hidden boss. Per round: wave template (by mode & round) → replace placeholders per research 05 §3.2 algorithm → apply stat multipliers (research 00-INDEX §5 `atk ×base×1.1^k`, `hp ×base×1.2^k`, ABYSS speed ×1.15 from R3) → `SpawnSpec[]` + routes resolved on the stage. *(Superseded by the official generator — §14 "Corrections from research 08/09" and the waves.js header.)* A player's normal battle (and the bot rehearsal) runs `withBounties(gd, round, wave, bounties, playerId)`: the bounty units inserted among their host action's own units, which are re-timed around them (client order); `previewOf` keeps one entry per action (`wave.spawns` + `bountySpawns`).

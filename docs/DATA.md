@@ -16,6 +16,7 @@ node tools/build-data.mjs --refresh    # re-download every official file; fail i
 node tools/build-data.mjs --no-research --out /tmp/x   # research-free build (fallback defaults), other dir
 node tools/build-data.mjs --cache <dir> --report <file> # other cache dir / report file (tests, CI)
 node tools/build-data.mjs --force      # write data/ even when integrity checks fail (debugging only)
+node tools/build-data.mjs --roster-only # regenerate backups + roster switch only; preserve other existing config tunables
 node --test test/data.test.js          # integrity tests (+ raw-data cross-check and rebuild check when .cache/gamedata exists)
 ```
 Unknown options or a missing option value are errors (exit code 2); `--refresh` and `--offline` are exclusive.
@@ -55,6 +56,14 @@ Unknown options or a missing option value are errors (exit code 2); `--refresh` 
 Top level: `{ season, seasonName, ulpiaTraitVersion, modes, economy, lpCapPerRound, bossOvertimeAfter, bossOvertimeDrainPerSec, bossHpScale, hiddenCore, dp, unite, finalAssault, timers, bans, bandDraft, titles, titleRule, tips, broadcasts, trophies, roundScores, rewards, constants }`.
 
 `ulpiaTraitVersion` is a project rule switch: `"modified"` grants 乌尔比安 1 阿戈尔重刃 on acquisition (2 for 精锐) and disables his original battle trait; `"original"` retains the original attack bonus. Missing or unknown values use `"original"` for compatibility with existing generated data. The generator emits `"modified"` for new builds.
+
+`clemntRosterVersion` is an independent project rule switch, emitted as `"modified"` by default. It replaces 流明
+in the tier-6 pool with 克莱门莎 (NORMAL, default S2 风暴潮; the tier-6 guard's Sharp backup), whose bonds are 阿戈尔 /
+迅捷 and whose trait grants +1% / +2% ATK per two combined active layers. 流明 becomes a DIY pick at tiers 5 and 6,
+with 协防 and no garrison. `"original"` (also missing / unknown values for older data) retains the original roster.
+Restart the server and reload clients after changing a switch. Original records remain in the generated files;
+`backups.rosterVariant` carries the alternative chess / garrison records and 流明's DIY metadata, and
+`shared/rosterVariant.js` applies the same immutable view in server, browser UI and simulation.
 
 ### 1.1 `modes[modeId]` (9 modes; `modeId = mode_${single|multi}_${difficulty}` + `mode_training_1`)
 
