@@ -17,6 +17,8 @@
 //                       sleep / stun). "进入…时": re-applying a running status (a refresh) is not a new entry
 //                       (engine statusApplied ctx.entered) — except a pulse that re-applies its own short status as a
 //                       fresh one (applyStatus `reenter`: 缇缇 S2's sleep ward, DESIGN §24.8).
+//                       project_gar_event_erosion_burst (克莱门莎 project trait): global elementBurst 'erosion',
+//                       any on-field target; the trait owner must also be on field. No range or faction filter.
 //                       Targets: bond_by_id / bond_self (own active bonds) / bond_actived_maxstack;
 //                       amounts: by_count / by_charcount_samerow / by_charlevel; conditions character_same_row /
 //                       character_same_col (≥ check_count incl. self). Gains go through support.gainLayers with
@@ -242,6 +244,13 @@ function ammoScope(it, u) {
 }
 
 const INSTALLERS = {
+  project_gar_event_erosion_burst(battle, list) {
+    battle.on('elementBurst', ({ target, element }) => {
+      if (element !== 'erosion' || !S.onField(target)) return;
+      for (const it of list) if (S.onField(it.unit)) fireGain(battle, it);
+    });
+  },
+
   act1autochess_gar_event_useskill(battle, list) {
     const m = byUnit(list);
     battle.on('skillStart', ({ unit }) => {

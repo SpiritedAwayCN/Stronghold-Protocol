@@ -1426,13 +1426,15 @@ function buildRosterVariant(backups, chess, garrisons) {
     const form = unitForm(backups, charId, identity.status);
     if (!form) throw new Error(`Missing Clement form ${statusKey(identity.status)}`);
     records[id] = composeUnitRecord(identity, unit, form, { skillIndex: 1 });
-    const rate = suffix === 'a' ? 1 : 2;
+    const count = suffix === 'a' ? 1 : 2;
+    const cap = count * 12;
+    const key = 'project_gar_event_erosion_burst';
     traits[gid] = {
-      ...garrisons[`garrison_05_${suffix}`], garrisonId: gid,
-      desc: `【阿戈尔】【迅捷】每叠加2层，本干员攻击力+${rate}%`,
-      descRaw: `【阿戈尔】【迅捷】每叠加2层，本干员攻击力<@ba.vup>+${rate}%</>`,
-      bb: { divide_num: 2, atk: rate / 100 },
-      bbStr: { key: 'act1autochess_gar_eff_attrByBond', bond_id: 'egirShip,swiftShip' },
+      ...garrisons[`garrison_95_${suffix}`], garrisonId: gid, effectKey: key,
+      desc: `<战斗中>每当场上有敌人或单位发生侵蚀损伤爆发时，使自身已激活的盟约层数+${count}（每场战斗至多${cap}层）`,
+      descRaw: `<战斗中>每当场上有敌人或单位发生<@ba.vup>侵蚀损伤爆发</>时，使自身已激活的盟约层数<@ba.vup>+${count}</>（每场战斗至多${cap}层）`,
+      bb: { bond_add_count: count, max_add_count_per_battle: cap },
+      bbStr: { key, bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: gid },
       owners: [id],
     };
   }

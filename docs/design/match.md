@@ -87,8 +87,11 @@ The project-specific `data/config.json → ulpiaTraitVersion` override defaults 
 
 The independent `clemntRosterVersion` switch defaults to `modified`: 克莱门莎 replaces 流明 in the tier-6 pool as a
 NORMAL operator (default S2 风暴潮, Sharp backup following the existing tier-6 guard rule). Her bonds are 阿戈尔 and
-迅捷; her IN_BATTLE trait uses 圣聆初雪's algorithm: floor((active 阿戈尔 layers + active 迅捷 layers) / 2) × 1% ATK
-(elite: 2%), a direct stat bonus refreshed on layer gains. The backup inherits these bonds and this trait.
+迅捷; while she is on field, each erosion burst by any on-field enemy or unit grants each of her own active bonds
++1 layer (elite: +2), up to 12 (elite: 24) per battle per bond and trait instance, using the same `bond_self` cap
+rules as 瑕光 / 锏. This includes equipment-granted bonds from 变形同构体. No range or faction restriction applies;
+gauge accumulation and burst-cooldown hits do not count. The old ATK trait is replaced. The backup inherits these
+bonds and this trait.
 流明 becomes a tier-5 / tier-6 DIY pick with 协防 and no trait. `original`, or a missing / unknown key, retains the
 original roster. This is an explicit maintainer-requested deviation from the official roster (2026-10-14), not an
 official seasonal update.

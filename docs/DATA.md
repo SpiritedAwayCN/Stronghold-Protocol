@@ -59,7 +59,8 @@ Top level: `{ season, seasonName, ulpiaTraitVersion, modes, economy, lpCapPerRou
 
 `clemntRosterVersion` is an independent project rule switch, emitted as `"modified"` by default. It replaces 流明
 in the tier-6 pool with 克莱门莎 (NORMAL, default S2 风暴潮; the tier-6 guard's Sharp backup), whose bonds are 阿戈尔 /
-迅捷 and whose trait grants +1% / +2% ATK per two combined active layers. 流明 becomes a DIY pick at tiers 5 and 6,
+迅捷 and whose trait grants its own active bonds +1 / +2 layers per on-field erosion burst (12 / 24 per battle
+per bond), including bonds granted by 变形同构体. 流明 becomes a DIY pick at tiers 5 and 6,
 with 协防 and no garrison. `"original"` (also missing / unknown values for older data) retains the original roster.
 Restart the server and reload clients after changing a switch. Original records remain in the generated files;
 `backups.rosterVariant` carries the alternative chess / garrison records and 流明's DIY metadata, and

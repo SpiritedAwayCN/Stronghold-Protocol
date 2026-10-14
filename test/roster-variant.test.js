@@ -9,17 +9,16 @@ import { GameData } from '../server/match/gamedata.js';
 import { SharedPool } from '../server/match/pool.js';
 import { DataSource, setSimData } from '../server/sim/simdata.js';
 import { KITTED_CHARS } from '../server/sim/content/kits/index.js';
-import { setGameData } from '../server/sim/content/support/index.js';
+import { setGameData, bondLayers, unitBonds } from '../server/sim/content/support/index.js';
 import { createDataStore } from '../public/js/data.js';
 import { loadBrowserSim } from '../public/js/battle/runner.js';
-import { makeBattle, checkInvariants } from './helpers/battleHarness.js';
+import { makeBattle, checkInvariants, enemyRec } from './helpers/battleHarness.js';
 
 const raw = Object.fromEntries(['config', 'chess', 'backups', 'garrisons', 'bonds', 'items', 'effects']
   .map(name => [name, JSON.parse(readFileSync(new URL(`../data/${name}.json`, import.meta.url)))]));
 const original = { ...raw, config: { ...raw.config, clemntRosterVersion: 'original' } };
 const modified = applyRosterVariant(raw);
 const C = 'chess_char_6_clemnt_a', L = 'chess_char_6_14_a';
-const approx = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} != ${b}`);
 
 test('default roster swaps the shared tier-6 stock, DIY picks and bond member lists without mutating original data', () => {
   assert.equal(raw.config.clemntRosterVersion, 'modified');
@@ -81,27 +80,64 @@ test('Clement defaults to S2, supports every skill and potential, and Sharp inhe
   }
 });
 
-test('Clement trait combines active layers before floor division, uses 1% / 2% and refreshes on gains, including backup', () => {
+test('Clement erosion trait gains own active bonds, including equipment grants and backup, with per-battle caps', () => {
   setGameData(modified);
   try {
+    const items = Object.entries(raw.items).filter(([, r]) => r.canGiveBond || r.giveBondId === 'sargonShip')
+      .filter(([id]) => id.endsWith('_a')).map(([id]) => id);
     for (const elite of [false, true]) for (const standIn of [false, true]) {
-      for (const [a, s, active, steps] of [[1, 1, true, 1], [3, 4, true, 3], [3, 100, false, 1], [0, 0, true, 0]]) {
-        const state = (layers, on) => ({ count: on ? 3 : 0, active: on, tier: on ? 1 : 0, layers });
-        const h = makeBattle({
-          data: new DataSource(modified), autoFinish: false,
-          units: [{ chessId: elite ? 'chess_char_6_clemnt_b' : C, standIn, row: 10, col: 3 }],
-          bonds: { egirShip: state(a, true), swiftShip: state(s, active) },
-        });
-        h.step();
-        const unit = h.unit(1), gid = elite ? 'garrison_clemnt_b' : 'garrison_clemnt_a';
-        const rate = elite ? 0.02 : 0.01;
-        approx(unit.findBuff(`gar:${gid}`)?.mods.atkPct ?? 0, steps * rate);
-        h.b.addLayers('p1', 'egirShip', 2, 'test');
-        h.step(2);
-        approx(unit.findBuff(`gar:${gid}`).mods.atkPct, (steps + 1) * rate);
-        assert.deepEqual(h.b.errors, []);
-      }
+      const state = (active = true) => ({ count: active ? 3 : 0, active, tier: active ? 1 : 0, layers: 5 });
+      const h = makeBattle({
+        data: new DataSource(modified), autoFinish: false,
+        units: [{ chessId: elite ? 'chess_char_6_clemnt_b' : C, standIn, items, row: 10, col: 3 }],
+        bonds: { egirShip: state(), swiftShip: state(false), sargonShip: state(), preciShip: state() },
+      });
+      h.step();
+      const unit = h.unit(1), n = elite ? 2 : 1;
+      assert.ok(unitBonds(unit).includes('sargonShip'), 'equipment-granted bond is part of own bonds');
+      const layers = id => bondLayers(h.b, 'p1', id);
+      const burst = target => h.b.emit('elementBurst', { source: null, target, element: 'erosion' });
+      const foe = h.spawn(enemyRec({ hp: 1e8, atk: 0 }), { pos: [10, 12] });
+      h.b.emit('elementBurst', { target: foe, element: 'necrosis' });
+      assert.equal(layers('egirShip'), 5);
+      burst(foe); burst(unit);
+      assert.equal(layers('egirShip'), 5 + 2 * n);
+      assert.equal(layers('sargonShip'), 5 + 2 * n);
+      assert.equal(layers('swiftShip'), 5, 'inactive own bond receives nothing');
+      assert.equal(layers('preciShip'), 5, 'unrelated active bond receives nothing');
+      unit.deployed = false; burst(foe); unit.deployed = true;
+      assert.equal(layers('egirShip'), 5 + 2 * n, 'trait owner must be on field');
+      h.b.flags.layerGainsEnabled = false; burst(foe); h.b.flags.layerGainsEnabled = true;
+      assert.equal(layers('egirShip'), 5 + 2 * n, 'disabled layer gains do not consume cap');
+      for (let i = 0; i < 20; i++) burst(foe);
+      assert.equal(layers('egirShip'), 5 + 12 * n);
+      assert.equal(layers('sargonShip'), 5 + 12 * n);
+      assert.equal(unit.findBuff(`gar:garrison_clemnt_${elite ? 'b' : 'a'}`), null, 'old ATK reader is removed');
+      assert.deepEqual(h.b.errors, []);
+      checkInvariants(h.b);
     }
+  } finally { setGameData(null); }
+});
+
+test('Clement trait listens to resolved erosion bursts, not gauge hits or burst cooldown hits', () => {
+  setGameData(modified);
+  try {
+    const h = makeBattle({ data: new DataSource(modified), autoFinish: false,
+      units: [{ chessId: C, row: 10, col: 3 }],
+      bonds: { egirShip: { count: 3, active: true, tier: 1, layers: 0 } } });
+    h.step();
+    const unit = h.unit(1), foe = h.spawn(enemyRec({ hp: 1e8, atk: 0 }), { pos: [10, 12] });
+    const hit = (source, target, amount) => h.b.dealDamage(source, target, { amount, type: 'element', element: 'erosion' });
+    hit(unit, foe, 1);
+    assert.equal(bondLayers(h.b, 'p1', 'egirShip'), 0);
+    hit(unit, foe, foe.gaugeMax * 100);
+    assert.equal(bondLayers(h.b, 'p1', 'egirShip'), 1);
+    hit(unit, foe, foe.gaugeMax * 100);
+    assert.equal(bondLayers(h.b, 'p1', 'egirShip'), 1);
+    hit(foe, unit, unit.gaugeMax * 100);
+    assert.equal(bondLayers(h.b, 'p1', 'egirShip'), 2, 'ally burst also triggers before burst damage resolves');
+    assert.deepEqual(h.b.errors, []);
+    checkInvariants(h.b);
   } finally { setGameData(null); }
 });
 

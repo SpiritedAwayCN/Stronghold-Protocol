@@ -10,8 +10,11 @@ every browser and on the server.
 The optional `clemntRosterVersion` roster (DATA.md §1) is applied both by `DataSource` and `setSimData`. The browser
 battle loader and simcheck fetch `config.json` alongside the combat tables so roster switches match the server;
 missing configuration fails the loader rather than silently simulating the original roster. 克莱门莎's
-new garrison reuses the existing `attrByBond` reader, including active-bond filtering, combined-layer floor division
-and layer-gain refresh; Sharp inherits it when fielded as her backup. 流明's existing kit is also registered by charId
+new garrison listens to the global `elementBurst` hook for `erosion`, with no range or faction restriction while
+its owner is on field. It reuses `bond_self` / `fireGain`: own active bonds, including 变形同构体 grants, receive
++1 / +2 layers with a per-instance, per-bond battle cap of 12 / 24; disabled layer gains remain a no-op. The hook
+fires once when a gauge actually bursts, before burst damage; gauge hits and hits during burst cooldown do not
+trigger it. Sharp inherits it when fielded as her backup. 流明's existing kit is also registered by charId
 for DIY picks, with all three skills and no DIY garrison.
 
 ```

@@ -320,8 +320,9 @@ export function GarrisonBlock({ garrison, m }) {
   useData('config', 'items');
   let shown = garrison;
   if (garrison.garrisonId === 'garrison_clemnt_a' || garrison.garrisonId === 'garrison_clemnt_b') {
-    const percent = garrison.garrisonId === 'garrison_clemnt_b' ? 2 : 1;
-    const desc = t('【阿戈尔】【迅捷】每叠加2层，本干员攻击力+{percent}%', { percent });
+    const count = garrison.bb.bond_add_count;
+    const cap = garrison.bb.max_add_count_per_battle;
+    const desc = t('<战斗中>每当场上有敌人或单位发生侵蚀损伤爆发时，使自身已激活的盟约层数+{count}（每场战斗至多{cap}层）', { count, cap });
     shown = { ...garrison, desc, descRaw: desc };
   }
   if (data.get('config')?.ulpiaTraitVersion === 'modified'
