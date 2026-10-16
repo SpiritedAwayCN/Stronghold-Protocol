@@ -597,8 +597,10 @@ test('the combat meter stays off unless the setting asks, and turning it off det
   on.runner.dispose();
 });
 
-test('a Worker host never attaches the combat meter, even when the setting is on', async () => {
-  let hooked = 0;
+test('a Worker host reads aggregate combat snapshots without hooking the page-side battle', async () => {
+  let hooked = 0, stopped = 0;
+  const record = { seconds: 1, owners: ['p_0'], rows: [{ key: 'op', ownerId: 'p_0', kind: 'op',
+    defId: 'test_op', name: 'Test', damage: 120, healing: 30, types: { phys: 120, arts: 0, true: 0, elemental: 0 } }] };
   const battle = {
     finished: true, time: 0, tickCount: 0, leakedCount: 0, flags: {}, allyUnits: [],
     snapshot: () => ({ t: 0 }),
@@ -613,7 +615,9 @@ test('a Worker host never attaches the combat meter, even when the setting is on
     battle,
     meter: { lp: 0 },
     async load() {},
-    async start() {},
+    async start(_spec, opts) { assert.equal(opts.combatMetrics, true); },
+    combatMetrics: () => structuredClone(record),
+    stopCombatMetrics: () => { stopped++; },
     async syncPool() {},
     stop() {},
     progress: () => ({ gt: 0, killed: 0, total: 0, done: true, leaks: 0 }),
@@ -627,8 +631,13 @@ test('a Worker host never attaches the combat meter, even when the setting is on
   await r.settle();
   const e = r.runner._entries.get('worker-1');
   assert.ok(e && !e.failed, 'the Worker battle was prepared');
-  assert.equal(e.combatMetrics, null);
+  assert.equal(typeof e.combatMetrics, 'function');
+  assert.equal(r.runner.combatMetrics({ scope: 'battle', ownerId: 'p_0' }).damage, 120);
+  assert.equal(r.runner.combatMetrics().healing, 30);
   assert.equal(hooked, 0);
+  r.runner.clear({ keepMetrics: true });
+  assert.equal(r.runner.combatMetrics().damage, 120, 'Worker totals survive round clearing');
+  assert.equal(stopped, 0, 'clearing terminates the host rather than sending a detach RPC');
   const prog = r.net.sent.filter((m) => m.t === 'b.progress');
   assert.ok(prog.length >= 1, 'progress is still the battle report');
   for (const msg of r.net.sent) {
@@ -646,7 +655,7 @@ test('settings expose 作战统计 off by default and the match hides the button
   assert.match(logic, /combatMetrics: false/);
   assert.match(settings, /label=\$\{t\('作战统计'\)\} micro="COMBAT STATS" value=\$\{s\.combatMetrics\}/);
   assert.match(game, /setCombatMetrics\(s\?\.combatMetrics === true\)/);
-  assert.match(game, /const showMetrics = metricsSetting && !modRoom && !spectator/);
+  assert.match(game, /const showMetrics = metricsSetting && !spectator;/);
   assert.match(game, /data-ui-slot="hud\.right"/);
   const state = { me: {}, room: null, match: { public: null, battle: null }, connection: { status: 'online' } };
   const line = (s) => buildDiagnostics({ state, env: {}, settings: s }).split('\n').find((l) => l.startsWith('settings:'));

@@ -197,10 +197,11 @@ export function createBattleRunner(deps) {
   const rememberCombat = (e) => {
     if (!e.combatMetrics) return;
     const record = e.combatMetrics();
+    if (!record) return;
     if (!(combatHistory.get(e.battleId)?.seconds > record.seconds)) combatHistory.set(e.battleId, record);
   };
   // Opt-in (设置「作战统计」, default off). A boolean deps.combatMetrics pins a test and ignores setCombatMetrics.
-  // Otherwise screens/game.js pushes the settings store. A Worker host never attaches: its page battle is wire state.
+  // Otherwise screens/game.js pushes the settings store. Worker hosts collect inside the Worker and expose snapshots.
   let metricsWanted = false;
   const metricsEnabled = () => (typeof deps.combatMetrics === 'boolean' ? deps.combatMetrics : metricsWanted);
   const detachCombat = (e) => {
@@ -795,7 +796,9 @@ export function createBattleRunner(deps) {
         if (e.host.remote) {
           await e.host.load(sim.cs, sim.content);
           if (!wanted()) return;
-          await e.host.start(e.spec);
+          const collectMetrics = metricsEnabled();
+          await e.host.start(e.spec, { combatMetrics: collectMetrics });
+          if (collectMetrics && !metricsEnabled()) await e.host.stopCombatMetrics();
         } else { e.host.sim = sim; e.host.start(e.spec, { logger }); }
         battle = e.host.battle;
       } catch (err) {
@@ -808,9 +811,15 @@ export function createBattleRunner(deps) {
       e.sim = sim;
       e.battle = battle;
       e.meter = e.host.meter;
-      // The Worker page holds wire state only (time, ids): no `damaged` hook and no `heal`, so trackCombat cannot
-      // run there. An in-page Battle gets the meter only when 作战统计 is on (default off; a test may pin it).
-      if (metricsEnabled() && !e.host.remote) e.combatMetrics = trackCombat(battle);
+      // Worker hosts collect on the real Battle, never on the page's wire-state stub.
+      if (metricsEnabled()) {
+        if (e.host.remote) {
+          if (e.host.combatMetrics()) {
+            e.combatMetrics = () => e.host.combatMetrics();
+            e.combatMetrics.stop = () => e.host.stopCombatMetrics();
+          }
+        } else e.combatMetrics = trackCombat(battle);
+      }
       e.t0 = clock() - (e.elapsed / e.speed) * 1000;
       if (lastPool) await e.host.syncPool(lastPool.hp, lastPool.acked ? lastPool.acked[e.fieldId] : undefined);
       if (e.endReason) await endBattle(e);

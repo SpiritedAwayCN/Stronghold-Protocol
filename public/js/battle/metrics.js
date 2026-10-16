@@ -1,4 +1,4 @@
-// Browser-only, read-only combat accounting. No event history or network payloads.
+// Browser-local, read-only combat accounting (main thread or simulation Worker). No event history or server payloads.
 export const DAMAGE_TYPES = Object.freeze(['phys', 'arts', 'true', 'elemental']);
 const positive = (n) => Number.isFinite(n) && n > 0 ? n : 0;
 

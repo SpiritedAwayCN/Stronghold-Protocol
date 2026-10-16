@@ -1,15 +1,22 @@
 // Kept separate from the browser port so the same engine/packets can be verified with a Node worker.
 import { InPageSimHost } from './simHost.js';
+import { trackCombat } from './metrics.js';
 
 export function createSimWorker({ loadSim, prepareScripts = browserScripts } = {}) {
   const host = new InPageSimHost(loadSim ? { loadSim } : {});
   let loaded = false;
   let loadingStarted = false;
   let installScripts = null;
+  let combatMetrics = null;
+  const stopCombatMetrics = () => {
+    combatMetrics?.stop();
+    combatMetrics = null;
+  };
   const packet = (step = null) => {
     const b = host.battle;
     const pids = (host.spec.players || []).map(p => p.playerId);
     return {
+      combatMetrics: combatMetrics?.() ?? null,
       snap: b.snapshot(), ev: b.drainEvents() || [], ticks: step?.ticks || 0, slices: step?.slices || [],
       state: { time: b.time, tickCount: b.tickCount, finished: b.finished, killed: b.killed, total: b.total,
         leakedCount: b.leakedCount, flags: b.flags,
@@ -45,7 +52,12 @@ export function createSimWorker({ loadSim, prepareScripts = browserScripts } = {
     }
     if (!loaded) throw new Error('simulation not loaded');
     switch (method) {
-      case 'start': host.start(args[0]); return packet();
+      case 'start':
+        stopCombatMetrics();
+        host.start(args[0]);
+        if (args[1]?.combatMetrics === true) combatMetrics = trackCombat(host.battle);
+        return packet();
+      case 'stopCombatMetrics': stopCombatMetrics(); return true;
       case 'step': {
         if (!Number.isInteger(args[0]) || args[0] < 0 || args[0] > 600) throw new Error('invalid step count');
         return packet(host.step(args[0], args[1] || {}));
@@ -54,7 +66,7 @@ export function createSimWorker({ loadSim, prepareScripts = browserScripts } = {
       case 'ownerOps': return host.ownerOps(args[0]);
       case 'syncPool': host.syncPool(...args); return true;
       case 'forceEnd': host.forceEnd(args[0]); return packet();
-      case 'stop': host.stop(); return true;
+      case 'stop': stopCombatMetrics(); host.stop(); return true;
       default: throw new Error('unknown simulation command');
     }
   };
