@@ -98,7 +98,7 @@ H.act1autochess_gar_eff_attrByBond = {
   },
   onGain(ctx) {
     const count = ctx.source.garrisonId === 'garrison_12_b' ? 2 : 1;
-    for (let i = 0; i < count; i++) ctx.grantItem('chess_item_3_07_e_a');
+    for (let i = 0; i < count; i++) ctx.grantItem('chess_item_3_07_e_a', { requirePool: false });
   },
 };
 

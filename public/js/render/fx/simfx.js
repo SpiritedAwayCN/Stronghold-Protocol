@@ -13,6 +13,7 @@ import { clamp } from './limits.js';
 const ANCHOR_SNAP = 0.75;
 
 const num = (v, d) => { const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN; return Number.isFinite(n) ? n : d; };
+const DIR_STEP = Object.freeze({ UP: [0, 1], RIGHT: [1, 0], DOWN: [0, -1], LEFT: [-1, 0] });
 
 export class FxSim {
   // ---- sim fx (b.ev ['fx', kind, x, y, extra]) -------------------------------------------------------------
@@ -193,6 +194,18 @@ export class FxSim {
         }
         this.particle('slash', hx, hy, { tint: col, life: 0.3, s0: hs / 128 * 1.3, s1: hs / 128 * 2.0, a0: 0.9, a1: 0, rot });
         this.particle('glow', hx, hy, { tint: col, life: 0.26, s0: hs / 128 * 0.8, s1: hs / 128 * 1.5, a0: 0.55, a1: 0 });
+        break;
+      }
+      case 'truesilverWave': {
+        const dir = DIR_STEP[String(at.v?.dir || 'RIGHT').toUpperCase()] || DIR_STEP.RIGHT;
+        const [fx, fy] = dir;
+        const startR = 0.1, endR = 3;
+        const attackInterval = Math.max(0.08, num(ex.attackInterval, 1.3));
+        const speed = 4.5 / attackInterval;
+        const dur = Math.max(0.18, (endR - startR) / speed / ts);
+        this.beamList.push({ arc: true, owner: at.v, x: at.x, y: at.y, z: at.z, fx, fy, color: col, t: 0, dur, startR, endR });
+        if (this.beamList.length > 40) this.beamList.shift();
+        this.particle('glow', p.x, p.y, { tint: 0xeaf4ff, life: Math.min(0.32, dur), s0: s / 128 * 0.45, s1: s / 128 * 1.1, a0: 0.55, a1: 0 });
         break;
       }
       case 'wave': {
