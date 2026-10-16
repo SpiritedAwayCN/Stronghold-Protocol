@@ -5,8 +5,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeBattle, chessRec, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
 import { getData } from '../../server/data.js';
+import { setGameData } from '../../server/sim/content/support/index.js';
 
-const D = getData({ log: { warn() {}, error() {}, info() {} } });
+const RAW_D = getData({ log: { warn() {}, error() {}, info() {} } });
+const D = { ...RAW_D, config: { ...RAW_D.config, ulpiaTraitVersion: 'original' } };
 const GR = (gid) => D.garrisons[gid];
 const ids = (s) => String(s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
 const num = (v, d = 0) => (Number.isFinite(+v) && v !== '' && v != null ? +v : d);
@@ -555,6 +557,20 @@ test('GAIN_BUFF (哈洛德 / 锡人 / 迷迭香 03, 流星 137) and 古米 08: d
   assert.equal(Math.round(stat('garrison_137_b').maxHp), 3000);
   approx(stat('garrison_08_a').spRecovery, 1.15);
   approx(stat('garrison_08_b').spRecovery, 1.3);
+});
+
+test('乌尔比安特质版本开关: 新版停用原作战攻击加成，原版保留', () => {
+  try {
+    setGameData({ ...D, config: { ...D.config, ulpiaTraitVersion: 'modified' } });
+    const modified = battle({ units: [{ id: 'ur', g: ['garrison_12_a'], row: 10, col: 4 }], bonds: { egirShip: B(20) } });
+    approx(modified.unit('ur').s.atk, 500, 'modified trait has no original bond bonus');
+
+    setGameData({ ...D, config: { ...D.config, ulpiaTraitVersion: 'original' } });
+    const original = battle({ units: [{ id: 'ur', g: ['garrison_12_a'], row: 10, col: 4 }], bonds: { egirShip: B(20) } });
+    approx(original.unit('ur').s.atk, 550, 'original trait remains active');
+  } finally {
+    setGameData(D);
+  }
 });
 
 test('attrByBond (26 ids): floor(Σ layers of the listed ACTIVE bonds / divide_num) × per-step values; live recompute', () => {

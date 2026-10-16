@@ -30,8 +30,8 @@ const plain = (pred = () => true) => Object.values(DATA.chess).filter((c) => c.v
 /** Visible normal chess without a 休整期结束时 特质 (fillers for prep-end tests). */
 const noPrepFin = (pred = () => true) => Object.values(DATA.chess).filter((c) => c.visible && !c.isGolden && (c.garrisonIds || []).every((g) => GR(g).eventType !== 'SERVER_PREP_FIN') && pred(c)).map((c) => c.chessId).sort();
 
-function setup(seed = 70) {
-  const h = makeMatch({ mode: 'solo', seed, registry: REG, fake: true }).start();
+function setup(seed = 70, data = { ...DATA, config: { ...DATA.config, ulpiaTraitVersion: 'original' } }) {
+  const h = makeMatch({ mode: 'solo', seed, data, registry: REG, fake: true }).start();
   h.toPrep(1);
   const m = h.m;
   const ps = h.ps('p_0');
@@ -114,6 +114,21 @@ test('投资人: 获得时 traits run ×2 while active, ×3 at ≥ 100 layers (d
   t.ps.recompute();
   t.acquire('chess_char_1_03_a');                                   // 惊蛰: shop level × 1
   assert.equal(t.G('yanShip'), 3 * t.ps.shop.level, '×3');
+});
+
+test('乌尔比安特质: 新版获得阿戈尔重刃，精锐获得两件；未配置时保留原版获得行为', () => {
+  const modified = { ...DATA, config: { ...DATA.config, ulpiaTraitVersion: 'modified' } };
+  const normal = setup(70, modified);
+  normal.acquire('chess_char_5_05_a');
+  assert.equal(itemUnits(normal.ps, 'chess_item_3_07_e_a'), 1);
+
+  const elite = setup(71, modified);
+  elite.acquire('chess_char_5_05_b');
+  assert.equal(itemUnits(elite.ps, 'chess_item_3_07_e_a'), 2);
+
+  const original = setup();
+  original.acquire('chess_char_5_05_a');
+  assert.deepEqual(handItems(original.ps), []);
 });
 
 test('SERVER_ADD_BOND 获得时: 烛煌 35 炎/维多利亚 +5 / +10; 录武官 (hidden 4_15) 156 + 157 grant 奇迹 once', () => {

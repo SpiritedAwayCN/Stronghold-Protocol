@@ -91,6 +91,17 @@ function rowCondition(ctx, me) {
 
 const H = {};
 
+H.act1autochess_gar_eff_attrByBond = {
+  garrisonHooks(g, gd) {
+    if (gd?.config?.ulpiaTraitVersion !== 'modified') return [];
+    return g?.garrisonId === 'garrison_12_a' || g?.garrisonId === 'garrison_12_b' ? ['onGain'] : [];
+  },
+  onGain(ctx) {
+    const count = ctx.source.garrisonId === 'garrison_12_b' ? 2 : 1;
+    for (let i = 0; i < count; i++) ctx.grantItem('chess_item_3_07_e_a');
+  },
+};
+
 H.SERVER_ADD_BOND = {
   run(ctx) {
     const { bb, bbStr, garrison, piece } = ctx.source;

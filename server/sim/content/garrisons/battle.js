@@ -78,6 +78,7 @@ export function install(battle) {
     if (!S.isOp(u)) continue;
     for (const gid of garrisonIdsOf(u)) {
       const g = S.garrisonRecord(gid);
+      if (S.modifiedUlpiaTrait() && (gid === 'garrison_12_a' || gid === 'garrison_12_b')) continue;
       if (g && g.eventType === 'IN_BATTLE') add(u, g);
     }
   }

@@ -53,7 +53,9 @@ Unknown options or a missing option value are errors (exit code 2); `--refresh` 
 
 ## 1. `config.json` — modes, economy and all global tunables
 
-Top level: `{ season, seasonName, modes, economy, lpCapPerRound, bossOvertimeAfter, bossOvertimeDrainPerSec, bossHpScale, hiddenCore, dp, unite, finalAssault, timers, bans, bandDraft, titles, titleRule, tips, broadcasts, trophies, roundScores, rewards, constants }`.
+Top level: `{ season, seasonName, ulpiaTraitVersion, modes, economy, lpCapPerRound, bossOvertimeAfter, bossOvertimeDrainPerSec, bossHpScale, hiddenCore, dp, unite, finalAssault, timers, bans, bandDraft, titles, titleRule, tips, broadcasts, trophies, roundScores, rewards, constants }`.
+
+`ulpiaTraitVersion` is a project rule switch: `"modified"` grants 乌尔比安 1 阿戈尔重刃 on acquisition (2 for 精锐) and disables his original battle trait; `"original"` retains the original attack bonus. Missing or unknown values use `"original"` for compatibility with existing generated data. The generator emits `"modified"` for new builds.
 
 ### 1.1 `modes[modeId]` (9 modes; `modeId = mode_${single|multi}_${difficulty}` + `mode_training_1`)
 

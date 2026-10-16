@@ -40,7 +40,7 @@ import { Img, RichText, UnitThumb, BondGlyph, GIcon, diyToken } from './gameComp
 import { attackInterval, rangeGridBox, fmtNum, tileKey, chessLoadout, nextThreshold, bondTier, briefingBondTip, pieceBondIds, grantedBonds, morphPairings, ownStandIn, standInOf, standInLoadout, standInLabel, standInTip, standInForText, ownDiyRecord, ownDiyPick, diyRecordFor, pickGetter, unitPick, unitCultivation } from './gameLogic.js';
 import { chessPortraitUrl, skillIconUrl, skillRecordIconUrl, profIconUrl, subProfIconUrl, itemIconUrl, enemyIconUrl, tokenAvatarUrl, factionIconUrl, uiUrl, moduleTypeIconUrl } from './assetUrls.js';
 import { abilityRows } from './abilityLines.js';
-import { data } from '../data.js';
+import { data, useData } from '../data.js';
 import { attackRangeGrid } from '../../../shared/loadoutRecord.js';
 import { SKILL_SUMMON_START_DEPLOY } from '../../../shared/constants.js';
 import { moduleBadge, fullTraitText } from './loadoutModel.js';
@@ -317,15 +317,24 @@ export function garrisonTypeIconKey(garrison) {
 
 /** The operator's own effect (特质, garrisons.json): trigger chip + description, compact. */
 export function GarrisonBlock({ garrison, m }) {
+  useData('config', 'items');
+  let shown = garrison;
+  if (data.get('config')?.ulpiaTraitVersion === 'modified'
+    && (garrison.garrisonId === 'garrison_12_a' || garrison.garrisonId === 'garrison_12_b')) {
+    const count = garrison.garrisonId === 'garrison_12_b' ? 2 : 1;
+    const itemName = data.lookup('items', 'chess_item_3_07_e_a')?.name || '阿戈尔重刃';
+    const desc = t('<获得时>获得{count}件{item}', { count, item: itemName });
+    shown = { ...garrison, eventType: 'SERVER_GAIN', eventTypeDesc: '单次叠加', eventTypeIcon: 'icon_bond', desc, descRaw: desc };
+  }
   return html`<section class="dgarrison" aria-label=${t('特质')} data-garrison=${garrison.garrisonId || ''}>
     <div class="dgarrison__head">
       <span class="dgarrison__k">${t('特质')}</span>
       <span class="dgarrison__type">
-        <${Img} src=${uiUrl(m, `garrisonTypeIcon/${garrisonTypeIconKey(garrison)}`)} class="dgarrison__icon" />
-        ${garrison.eventTypeDesc || ''}
+        <${Img} src=${uiUrl(m, `garrisonTypeIcon/${garrisonTypeIconKey(shown)}`)} class="dgarrison__icon" />
+        ${shown.eventTypeDesc || ''}
       </span>
     </div>
-    <${RichText} as="p" text=${garrison.descRaw || garrison.desc} class="dgarrison__text" />
+    <${RichText} as="p" text=${shown.descRaw || shown.desc} class="dgarrison__text" />
   </section>`;
 }
 
