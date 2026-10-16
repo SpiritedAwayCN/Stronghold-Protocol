@@ -722,7 +722,7 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
-      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, combatMetrics: false, prepDeployFold: true, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: { ...DEFAULT_SETTINGS.keys } },
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'auto', otherSkins: true, textSize: 'sm', keys: { ...DEFAULT_SETTINGS.keys } },
       'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
     // 显示其他玩家的皮肤 (docs/SKINS.md): on by default, and off only when the profile says so
     assert.equal(DEFAULT_SETTINGS.otherSkins, true);
@@ -738,6 +738,13 @@ describe('keyboard & settings', () => {
     assert.equal(DEFAULT_SETTINGS.combatMetrics, false);
     assert.equal(sanitizeSettings({ bgm: 0.5 }).combatMetrics, false, 'a profile saved before 作战统计 stays off');
     assert.equal(sanitizeSettings({ combatMetrics: true }).combatMetrics, true);
+    assert.equal(DEFAULT_SETTINGS.prepDeployFold, false);
+    assert.equal(sanitizeSettings({ deployFoldsShop: true }).prepDeployFold, true);
+    assert.equal(sanitizeSettings({ deployFoldsShop: false }).prepDeployFold, false);
+    assert.equal(sanitizeSettings({ prepDeployFold: false, deployFoldsShop: true }).prepDeployFold, false);
+    assert.equal(sanitizeSettings({ prepDeployFold: true, deployFoldsShop: false }).prepDeployFold, true);
+    assert.equal(sanitizeSettings({ prepDeployFold: 'yes', deployFoldsShop: 'yes' }).prepDeployFold, false);
+    assert.equal(Object.hasOwn(sanitizeSettings({ deployFoldsShop: true }), 'deployFoldsShop'), false);
     // 官方特效 (0.3.0): 'auto' by default (完整 on a desktop, 精简 on a touch device); unknown values fall back to it
     assert.equal(DEFAULT_SETTINGS.officialFx, 'auto');
     assert.equal(sanitizeSettings({ bgm: 0.5 }).officialFx, 'auto', 'a profile saved before 官方特效 gets the default');
