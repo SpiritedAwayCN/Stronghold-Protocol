@@ -227,6 +227,11 @@ export function createBattleRunner(deps) {
   let simP = null;
   /** the content set simP was loaded for (null: the original content) */
   let simCs = null;
+  /** An idle gameplay-plugin Worker that has completed load/install and can serve the next Battle. */
+  let warmHost = null;
+  let warmHostCs = null;
+  let warmHostP = null;
+  let warmGeneration = 0;
   let startSeq = 0;            // counts the b.starts: the latest one is the view asked for
   let loading = null;          // the pending entry of the latest b.start (shown when prepared)
   let rafH = null;
@@ -277,6 +282,58 @@ export function createBattleRunner(deps) {
     }) : loadSim(null)).catch((err) => { if (simP === p) { simP = null; simCs = null; } throw err; });
     simP = p;
     return p;
+  }
+
+  function discardWarmHost() {
+    warmGeneration++;
+    const host = warmHost;
+    warmHost = null;
+    warmHostCs = null;
+    warmHostP = null;
+    host?.stop?.();
+  }
+
+  /** Warm one gameplay Worker before b.start; vanilla keeps its existing in-page path. */
+  function prewarm(cs = null) {
+    const vanilla = vanillaCs();
+    const want = typeof cs === 'string' && vanilla != null && cs !== vanilla ? cs : null;
+    if (!want) { discardWarmHost(); return Promise.resolve(null); }
+    // Do not compete with contentFor() while the set is still being checked; the battle's prepare() owns that wait.
+    const held = heldContent();
+    if (!held || held.cs !== want) return Promise.resolve(null);
+    if (warmHostP && warmHostCs === want) return warmHostP;
+    if (warmHost && warmHostCs === want && !warmHost.stopped) return Promise.resolve(warmHost);
+    discardWarmHost();
+    warmHostCs = want;
+    const generation = warmGeneration;
+    const p = ensureSim(want).then((sim) => {
+      if (!sim?.remote || generation !== warmGeneration) return null;
+      const host = new WorkerSimHost({ onFailure: () => { if (warmHost === host) discardWarmHost(); } });
+      warmHost = host;
+      warmHostCs = want;
+      return host.load(sim.cs, sim.content).then(() => {
+        if (generation !== warmGeneration || warmHost !== host) { host.stop(); return null; }
+        return host;
+      });
+    }).catch((err) => {
+      if (warmHostP === p) discardWarmHost();
+      console.warn('[runner] simulation prewarm failed', err);
+      return null;
+    });
+    warmHostP = p;
+    p.finally(() => { if (warmHostP === p) warmHostP = null; });
+    return p;
+  }
+
+  async function takeWarmHost(cs, sim) {
+    if (!sim?.remote) return null;
+    if (warmHostP && warmHostCs === cs) await warmHostP;
+    if (!warmHost || warmHostCs !== cs || warmHost.stopped) return null;
+    const host = warmHost;
+    warmHost = null;
+    warmHostCs = null;
+    warmHostP = null;
+    return host;
   }
 
   /** Counted leaks so far of every normal field simulated here: { [fieldId]: n } (user playtest #3 item 2). */
@@ -790,11 +847,13 @@ export function createBattleRunner(deps) {
       if (!csAccepted(e.spec.cs)) e.authoritative = false;
       let battle;
       try {
-        e.host = deps.createHost ? deps.createHost(sim, err => failWorker(e, err)) : sim.remote
+        const warmed = !deps.createHost && sim.remote ? await takeWarmHost(e.spec.cs, sim) : null;
+        e.host = warmed || (deps.createHost ? deps.createHost(sim, err => failWorker(e, err)) : sim.remote
           ? new WorkerSimHost({ onFailure: err => failWorker(e, err), timeoutMs: deps.workerTimeoutMs })
-          : new InPageSimHost();
+          : new InPageSimHost());
+        if (warmed) warmed.onFailure = err => failWorker(e, err);
         if (e.host.remote) {
-          await e.host.load(sim.cs, sim.content);
+          if (!warmed) await e.host.load(sim.cs, sim.content);
           if (!wanted()) return;
           const collectMetrics = metricsEnabled();
           await e.host.start(e.spec, { combatMetrics: collectMetrics });
@@ -951,7 +1010,12 @@ export function createBattleRunner(deps) {
       // warm the simulation up as soon as a match runs (the first b.start then starts at once) — on the room's content set
       // when it plays one (DESIGN §32.6)
       const roomCs = s && s.room && s.room.content && s.room.content.vanilla === false ? s.room.content.cs : null;
-      if (phase && phase !== 'LOBBY' && (!simP || simCs !== (roomCs || null))) ensureSim(roomCs).catch(() => {});
+      if (phase && phase !== 'LOBBY') {
+        if (!simP || simCs !== (roomCs || null)) ensureSim(roomCs).catch(() => {});
+        const combatPhase = ['COMBAT', 'UNITE', 'FINAL_ASSAULT', 'HIDDEN_CORE'].includes(phase);
+        if (roomCs && !combatPhase) prewarm(roomCs);
+        else if (!roomCs || combatPhase) discardWarmHost();
+      } else discardWarmHost();
     }));
   }
   if (doc && typeof doc.addEventListener === 'function') {
@@ -1047,8 +1111,8 @@ export function createBattleRunner(deps) {
     _entries: entries,
     _frame: frame,
     _pump: pump,
-    onStart, onPool, onEnd, clear, ensureSim, redeliver, setPaused,
-    dispose() { clear(); for (const off of offs) { try { off?.(); } catch { /* ignore */ } } },
+    onStart, onPool, onEnd, clear, ensureSim, prewarm, redeliver, setPaused,
+    dispose() { clear(); discardWarmHost(); for (const off of offs) { try { off?.(); } catch { /* ignore */ } } },
   };
 }
 
