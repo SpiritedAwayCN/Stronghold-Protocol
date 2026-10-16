@@ -23,8 +23,63 @@ export class FxBeams {
     g.clear();
     let w = 0;
     const p = this._p, q = this._q;
+    const cam = this.ctx.cam();
     for (const bm of this.beamList) {
       bm.t += dt;
+      if (bm.arc) {
+        const owner = bm.owner && bm.owner.alive !== false ? bm.owner : null;
+        const cx = owner?.x ?? bm.x, cy = owner?.y ?? bm.y, cz = owner?.z ?? bm.z;
+        const progress = Math.min(1, bm.t / bm.dur);
+        // Ease out: the wave leaves the operator quickly, then settles as it reaches the outer edge.
+        const spread = 1 - (1 - progress) * (1 - progress);
+        const radius = bm.startR + (bm.endR - bm.startR) * spread;
+        const sideX = -bm.fy, sideY = bm.fx;
+        const segs = this.quality === 'low' ? 12 : 20;
+        const scale = cam.project(cx, cy, cz + 0.35, this._g).s;
+        const wobble = (theta) => Math.sin(theta * 3.2 + bm.t * 18) * 0.035;
+        const drawArc = (from, to, count, width, color, alpha, offset = 0) => {
+          const bands = 5;
+          for (let band = 0; band < bands; band++) {
+            const a = from + (to - from) * band / bands;
+            const b = from + (to - from) * (band + 1) / bands;
+            g.lineStyle(Math.max(1, scale * width), color, alpha);
+            const point = (theta, out) => {
+              const rr = Math.max(bm.startR, radius + wobble(theta) + offset);
+              const dx = bm.fx * Math.cos(theta) + sideX * Math.sin(theta);
+              const dy = bm.fy * Math.cos(theta) + sideY * Math.sin(theta);
+              return cam.project(cx + dx * rr, cy + dy * rr, cz + 0.35, out);
+            };
+            const start = point(a, p);
+            g.moveTo(start.x, start.y);
+            const steps = Math.max(2, Math.ceil(count / bands));
+            for (let i = 0; i < steps; i++) {
+              const theta0 = a + (b - a) * i / steps;
+              const theta1 = a + (b - a) * (i + 1) / steps;
+              const control = point((theta0 + theta1) / 2, this._g);
+              const end = point(theta1, q);
+              g.quadraticCurveTo(control.x, control.y, end.x, end.y);
+            }
+          }
+        };
+        const fade = 1 - progress;
+        // One continuous arc: overlapping layers keep the silver body and blue halo connected as one gradient.
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.78, 0x9fcfff, fade * 0.025, 0.13);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.54, 0xb9dcff, fade * 0.06, 0.075);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.34, 0xd9edff, fade * 0.16, 0.035);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.17, 0xf5faff, fade * 0.4);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.11, bm.color, fade * 0.64, -0.035);
+        // A small visual gap separates the thinner inner filaments from the broad silver body.
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.04, 0xeaf4ff, fade * 0.2, -0.065);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.018, 0xffffff, fade * 0.86, -0.095);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.014, 0xe3efff, fade * 0.76, -0.125);
+        drawArc(-Math.PI / 2, Math.PI / 2, segs, 0.012, 0xaed7ff, fade * 0.7, -0.155);
+        // A compact travelling highlight keeps the arc alive without spawning more particles.
+        const pulse = -Math.PI / 2 + spread * Math.PI;
+        const pulseAlpha = fade * (0.65 + 0.35 * Math.sin(bm.t * 30));
+        drawArc(Math.max(-Math.PI / 2, pulse - 0.22), Math.min(Math.PI / 2, pulse + 0.22), 4, 0.045, 0xffffff, pulseAlpha, -0.055);
+        if (bm.t < bm.dur) this.beamList[w++] = bm;
+        continue;
+      }
       if (bm.t >= bm.dur || !bm.a || !bm.b) continue;
       // a chain bounce leaves the previous target where the shot met it (its chest), a beam leaves the shooter's hands
       this._bodyPt(bm.a, bm.chain ? SHOT_HEIGHT.aim : SHOT_HEIGHT.launch, p); const px = p.x, py = p.y, s = p.s;

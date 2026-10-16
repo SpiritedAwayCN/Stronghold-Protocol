@@ -29,7 +29,9 @@ export default withDefaults({
         targeting: { ...(g ? { rangeGrid: g } : {}), maxTargets: Math.max(1, Math.floor(num(bb['attack@max_target'], 4))) },
         attack: { projectile: 'none', dmgMul: () => 1 },       // 视为近距离攻击: no ranged ×0.8
         onStart({ battle, unit }) { battle.fx('truesilver', { x: unit.x, y: unit.y, id: unit.id }); },
-        onAttack({ battle, unit }) { battle.fx('slash', { x: unit.x, y: unit.y, id: unit.id }); },
+        onAttack({ battle, unit }) {
+          battle.fx('truesilverWave', { x: unit.x, y: unit.y, id: unit.id, attackInterval: unit.s.interval });
+        },
       },
       talents: [
         { install(battle, unit) { // 领袖: ATK +10 %; every unit of the team redeploys 10 % faster

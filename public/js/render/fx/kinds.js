@@ -20,6 +20,7 @@ export const FX_KINDS = Object.freeze({
   // 赤刃明霄陈 S3 赤霄·天喟 的龙剑气: a travelling blade, drawn from the sim's per-interval `chen3Wave` events (its own
   // position + the previous point + direction); `pt` because it is not at the caster (it roams and passes by her tile)
   chen3Wave: { a: 'qi', c: 0xdfe8ff, pt: true },
+  truesilverWave: { a: 'truesilverWave', c: 0xdfe8ff },
   quadShot: { a: 'volley', c: 0xfff2d0 }, featherArrow: { a: 'counter', c: 0xfff2d0 },
   burst: { a: 'element', c: 0xd0a0ff },
   // areas
