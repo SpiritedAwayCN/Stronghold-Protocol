@@ -243,7 +243,14 @@ function ammoScope(it, u) {
 
 const INSTALLERS = {
   act1autochess_gar_event_useskill(battle, list) {
-    const m = byUnit(list);
+    const erosion = list.filter((it) => it.bbStr.key === 'project_gar_event_erosion_burst');
+    const skill = list.filter((it) => it.bbStr.key !== 'project_gar_event_erosion_burst');
+    if (erosion.length) battle.on('elementBurst', ({ target, element }) => {
+      if (element !== 'erosion' || !S.onField(target)) return;
+      for (const it of erosion) if (S.onField(it.unit)) fireGain(battle, it);
+    });
+    if (!skill.length) return;
+    const m = byUnit(skill);
     battle.on('skillStart', ({ unit }) => {
       const arr = m.get(unit);
       if (arr) for (const it of arr) fireGain(battle, it);
