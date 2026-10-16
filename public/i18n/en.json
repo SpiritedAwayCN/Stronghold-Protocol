@@ -159,6 +159,8 @@
   "官方伤害数字": "Official Damage Numbers",
   "只显示达到官方暴击条件的红色数字。关闭时仍显示每一次命中。": "Show only red numbers that meet the official crit rule. While off, every hit still shows a number.",
   "弹药数量": "Ammo Count",
+  "拖动时收起商店": "Fold shop while dragging",
+  "备战阶段拖动干员或装备时暂时收起商店并放大棋盘；关闭时保持旧版商店展开行为。": "Temporarily fold the shop and enlarge the board while dragging an operator or equipment during prep; off keeps the legacy open-shop behavior.",
   "官方特效": "Official Effects",
   "关": "Off",
   "精简": "Lite",

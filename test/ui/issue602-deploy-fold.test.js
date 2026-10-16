@@ -17,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (p) => readFileSync(path.join(ROOT, p), 'utf8');
 
 const { deployFoldsShop, prepCameraFor } = await import('../../public/js/ui/gameLogic.js');
+const { DEFAULT_SETTINGS, sanitizeSettings } = await import('../../public/js/ui/gameLogic/settings.js');
 const { hudBands } = await import('../../public/js/ui/fieldHost.js');
 const { presetCamera } = await import('../../public/js/render/projection.js');
 const { FOLD_CAMERA_MS, CAMERA_MS } = await import('../../public/js/render/app/tune.js');
@@ -26,10 +27,16 @@ const { FOLD_CAMERA_MS, CAMERA_MS } = await import('../../public/js/render/app/t
 describe('deployFoldsShop: the deploy interaction temporarily folds the shop', () => {
   const own = { ownPrep: true, editable: true, pen: false };
 
-  test('a dragged piece or the open direction wheel on the editable own prep board folds it', () => {
-    assert.equal(deployFoldsShop({ ...own, drag: true }), true, 'piece picked up (operator / equipment / summon)');
-    assert.equal(deployFoldsShop({ ...own, facing: true }), true, 'direction wheel of a legal drop');
-    assert.equal(deployFoldsShop({ ...own, drag: true, facing: true }), true, 'both at once (drop → wheel)');
+  test('a dragged piece or the open direction wheel on the editable own prep board folds it when enabled', () => {
+    assert.equal(deployFoldsShop({ ...own, enabled: true, drag: true }), true, 'piece picked up (operator / equipment / summon)');
+    assert.equal(deployFoldsShop({ ...own, enabled: true, facing: true }), true, 'direction wheel of a legal drop');
+    assert.equal(deployFoldsShop({ ...own, enabled: true, drag: true, facing: true }), true, 'both at once (drop → wheel)');
+  });
+
+  test('the legacy open-shop behavior is the default setting and can disable the fold', () => {
+    assert.equal(DEFAULT_SETTINGS.deployFoldsShop, false);
+    assert.equal(sanitizeSettings({}).deployFoldsShop, false);
+    assert.equal(deployFoldsShop({ ...own, enabled: false, drag: true }), false);
   });
 
   test('not on another board, not read-only, not over the enemy pen, and never without an interaction', () => {
@@ -61,7 +68,7 @@ describe('game.js wiring', () => {
   const game = read('public/js/screens/game.js');
 
   test('deployFold is derived from the interaction state on the own editable prep board, never written into `collapsed`', () => {
-    assert.match(game, /const deployFold = deployFoldsShop\(\{\n\s+ownPrep: !!view && viewModeRef\.current === 'prep' && showPrep, editable, pen, drag: !!drag, facing: !!facing,\n\s+\}\);/);
+    assert.match(game, /const deployFold = deployFoldsShop\(\{\n\s+ownPrep: !!view && viewModeRef\.current === 'prep' && showPrep, editable, pen, drag: !!drag, facing: !!facing,\n\s+enabled: deployFoldSetting,\n\s+\}\);/);
     // the player's own state feeds the camera state only ORed with the temporary fold (pen behavior untouched)
     assert.match(game, /const shopFolded = showShop && \(pen \? penRef\.current\.collapsed : \(collapsed \|\| deployFold\)\);/);
     assert.match(game, /const barCollapsed = collapsed \|\| deployFold;/);

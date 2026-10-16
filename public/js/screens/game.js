@@ -180,7 +180,9 @@ function MatchScreen() {
   const emotes = useStore((s) => s.emotes);
   const roomSolo = useStore((s) => s.room?.mode === 'solo');
   const spectator = useStore((s) => isSpectating(s.room, s.me.playerId));
-  const metricsSetting = useSettings().combatMetrics === true;
+  const settings = useSettings();
+  const metricsSetting = settings.combatMetrics === true;
+  const deployFoldSetting = settings.deployFoldsShop === true;
   // gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark — re-rendered only when the room's content changes
   const modRoom = useStore((s) => (s.room?.content?.vanilla === false ? s.room : null), (a, b) => (a?.content ?? null) === (b?.content ?? null));
   // the room's spectator seats for the top bar's 观战席 capsule (ui/hud.js SpectatorPill; GitHub #120): room.state keeps coming
@@ -423,6 +425,7 @@ function MatchScreen() {
   // derived from the interaction state only: `collapsed` (the 收起/展开 state) is never set by it.
   const deployFold = deployFoldsShop({
     ownPrep: !!view && viewModeRef.current === 'prep' && showPrep, editable, pen, drag: !!drag, facing: !!facing,
+    enabled: deployFoldSetting,
   });
   // the shop bar is shown folded (收起; the pen folds it for itself: the player's own state is the one it returns to) —
   // the own prep board then takes the official shop-collapsed camera (public issue #5, gameLogic prepCameraFor);
