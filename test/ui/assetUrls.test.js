@@ -62,6 +62,12 @@ describe('assetUrls', () => {
     assert.equal(effectIconUrl(m, { iconKind: 'x' }), null);
     assert.ok(uiUrl(m, 'hudPanel/icon_hp'));
   });
+  test('plugin chess can reuse an official art entry by asset id', () => {
+    const custom = { charId: 'char_x_roster_clemnt_clemnt', assets: { portrait: 'char_4231_clemnt' } };
+    assert.equal(chessPortraitUrl(m, custom), m.chars.char_4231_clemnt.portrait);
+    assert.equal(chessPortraitUrl(m, { ...custom, isGolden: true }), m.chars.char_4231_clemnt.portraitE2);
+  });
+
   test('missing manifest / ids ⇒ null, never throws', () => {
     for (const fn of [chessAvatarUrl, chessPortraitUrl, skillIconUrl, subProfIconUrl, itemIconUrl]) {
       assert.equal(fn(null, null), null);

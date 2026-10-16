@@ -45,6 +45,9 @@ export function chessPortraitUrl(m, chess) {
       const base = chars[id.slice(0, -2)];
       if (base) return str(base.portrait);
     }
+    // Plugin records may name an official art entry directly (for example, a custom operator using an extracted model).
+    const byArt = chars[id];
+    if (byArt) return (chess?.isGolden ? str(byArt.portraitE2) : null) || str(byArt.portrait);
   }
   const byChar = chess?.charId ? chars[chess.charId] : null;
   if (!byChar) return null;
