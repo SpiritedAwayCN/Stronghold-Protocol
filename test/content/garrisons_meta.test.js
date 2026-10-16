@@ -126,6 +126,16 @@ test('乌尔比安特质: 新版获得阿戈尔重刃，精锐获得两件；未
   elite.acquire('chess_char_5_05_b');
   assert.equal(itemUnits(elite.ps, 'chess_item_3_07_e_a'), 2);
 
+  for (const [seed, chessId, count] of [[72, 'chess_char_5_05_a', 1], [73, 'chess_char_5_05_b', 2]]) {
+    const s = setup(seed, modified);
+    const itemId = 'chess_item_3_07_e_a';
+    const cap = s.m.itemPool.cap(itemId);
+    for (let i = 0; i < cap; i++) assert.ok(s.ps.acquireItem(itemId));
+    assert.equal(s.m.itemPool.left(itemId), 0);
+    s.acquire(chessId);
+    assert.equal(s.m.itemPool.held(itemId), cap + count);
+  }
+
   const original = setup();
   original.acquire('chess_char_5_05_a');
   assert.deepEqual(handItems(original.ps), []);
