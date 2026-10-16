@@ -322,9 +322,9 @@ export function GarrisonBlock({ garrison, m }) {
   if (data.get('config')?.ulpiaTraitVersion === 'modified'
     && (garrison.garrisonId === 'garrison_12_a' || garrison.garrisonId === 'garrison_12_b')) {
     const count = garrison.garrisonId === 'garrison_12_b' ? 2 : 1;
-    const itemName = data.lookup('items', 'chess_item_3_07_e_a')?.name || '阿戈尔重刃';
+    const itemName = data.lookup('items', 'chess_item_3_07_e_a')?.name || t('阿戈尔重刃');
     const desc = t('<获得时>获得{count}件{item}', { count, item: itemName });
-    shown = { ...garrison, eventType: 'SERVER_GAIN', eventTypeDesc: '单次叠加', eventTypeIcon: 'icon_bond', desc, descRaw: desc };
+    shown = { ...garrison, eventType: 'SERVER_GAIN', eventTypeDesc: t('单次叠加'), eventTypeIcon: 'icon_bond', desc, descRaw: desc };
   }
   return html`<section class="dgarrison" aria-label=${t('特质')} data-garrison=${garrison.garrisonId || ''}>
     <div class="dgarrison__head">
