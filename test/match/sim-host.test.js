@@ -7,6 +7,7 @@ import { InPageSimHost, WorkerSimHost } from '../../public/js/battle/simHost.js'
 import { loadBrowserSim } from '../../public/js/battle/simLoader.js';
 import { forkSandbox } from '../../server/match/host/childHost.js';
 import { createBattleRunner } from '../../public/js/battle/runner.js';
+import { trackCombat } from '../../public/js/battle/metrics.js';
 import { createStore, initialState } from '../../public/js/store.js';
 import { validateC2S } from '../../shared/protocol.js';
 import { fixtureSet, fixtureSpec, scriptSet as makeScriptSet, operatorScript } from '../helpers/simHostFixture.js';
@@ -49,6 +50,7 @@ test('runner on a real Worker reports its simulated cs and cached detail stats; 
   store: createStore(initialState), contentFor: async () => set, simContent: () => set, vanillaCs: () => 'b'.repeat(64),
   createHost: (_, onFailure) => remote({ onFailure }), raf: () => 1, caf: () => {}, setInterval: () => 1, clearInterval: () => {}, now: () => now, doc: null });
   t.after(() => runner.dispose());
+  runner.setCombatMetrics(true);
   await runner.onStart({ battleId: 'probe', fieldId: 'n:p1', authoritative: true, spec });
   const e = runner._entries.get('probe'); assert.equal(e.host.remote, true); assert.equal(e.battle.step, undefined);
   runner.setPaused(true); now += 2000; runner._frame(); assert.equal(e.battle.tickCount, 0); runner.setPaused(false);
@@ -62,18 +64,31 @@ test('runner on a real Worker reports its simulated cs and cached detail stats; 
   const id = runner.unitIdOf(1, 'p1'); assert.ok(id != null); assert.equal(runner.unitStats(id), null);
   while (e.host.statsPending.size) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(runner.unitStats(id).id, id);
-  runner.clear(); assert.equal(e.host.stopped, true); assert.equal(runner.state(), null);
+  const metrics = runner.combatMetrics({ scope: 'battle', ownerId: 'p1' });
+  assert.ok(metrics.damage > 0, 'plugin Worker damage reaches the panel');
+  const totals = runner.combatMetrics();
+  await runner.onStart({ battleId: 'probe', fieldId: 'n:p1', authoritative: true, spec });
+  assert.deepEqual(runner.combatMetrics(), totals, 'a repeated b.start does not double count');
+  assert.ok(sent.every(m => m.combatMetrics === undefined && m.rows === undefined), 'statistics stay off the server protocol');
+  runner.clear({ keepMetrics: true });
+  assert.deepEqual(runner.combatMetrics(), totals, 'totals survive prep and Worker termination');
+  assert.equal(e.host.stopped, true); assert.equal(runner.state(), null);
+  runner.clear();
+  assert.equal(runner.combatMetrics().damage, 0);
 });
 
 test('data set: Worker and in-page snapshots/events/results match every batch; bounds, stats, owners', async t => {
   const a = local(), b = remote(); t.after(() => b.stop());
   const set = fixtureSet(), spec = fixtureSpec();
-  await a.load(set.cs, set); await b.load(set.cs, set); a.start(spec); await b.start(spec);
+  await a.load(set.cs, set); await b.load(set.cs, set); a.start(spec); await b.start(spec, { combatMetrics: true });
+  const read = trackCombat(a.battle);
+  assert.deepEqual(b.combatMetrics(), read());
   assert.equal(await b.rpc('bounds'), 120, 'Worker installed the official snapshot, not plugin data');
   assert.deepEqual(b.battle.snapshot(), a.battle.snapshot()); a.battle.drainEvents(); b.battle.drainEvents();
   while (!a.battle.finished) {
     const x = a.step(8, { slice: 3 }), y = await b.step(8, { slice: 3 });
     assert.deepEqual(y.snap, x.snap); assert.deepEqual(y.ev, x.ev); assert.deepEqual(y.slices, x.slices);
+    assert.deepEqual(b.combatMetrics(), read(), 'Worker damage/healing matches the in-page collector every batch');
   }
   assert.deepEqual(b.compactResult(), a.compactResult({}));
   assert.equal(b.compactResult().errors, 0);
@@ -84,13 +99,31 @@ test('data set: Worker and in-page snapshots/events/results match every batch; b
   assert.equal(typeof globalThis.lockdown, 'undefined', 'data/vanilla never install SES in the main realm');
 });
 
+test('Worker statistics default off, stop mid-battle and only restart for the next battle', async t => {
+  const host = remote(); t.after(() => host.stop());
+  const set = fixtureSet(), spec = fixtureSpec();
+  await host.load(set.cs, set);
+  await host.start(spec);
+  await host.step(60);
+  assert.equal(host.combatMetrics(), null);
+  await host.start(spec, { combatMetrics: true });
+  await host.step(90);
+  assert.ok(host.combatMetrics().rows.some(row => row.damage > 0));
+  await host.stopCombatMetrics();
+  await host.step(30);
+  assert.equal(host.combatMetrics(), null, 'no statistics are collected or serialized after disabling');
+  await host.start(spec, { combatMetrics: true });
+  assert.ok(host.combatMetrics().rows.every(row => row.damage === 0 && row.healing === 0));
+});
+
 test('script operator: permission child and Worker have byte-identical ev/results', async t => {
   const a = new WorkerSimHost({ workerFactory: () => nodePort(true) }), b = remote(), native = remote();
   t.after(() => { a.stop(); b.stop(); native.stop(); });
   const set = makeScriptSet(operatorScript), spec = fixtureSpec();
   const nativeSet = makeScriptSet(operatorScript,'trusted');
   await native.load(nativeSet.cs,nativeSet);await native.start(spec);
-  await a.load(set.cs, set); await b.load(set.cs, set); await a.start(spec); await b.start(spec);
+  await a.load(set.cs, set); await b.load(set.cs, set); await a.start(spec); await b.start(spec, { combatMetrics: true });
+  assert.equal(a.combatMetrics(), null, 'statistics default off in a script Worker');
   await a.step(1); await b.step(1);await native.step(1);
   const stats = await b.rpc('unitStats', [b.battle.allyUnits[0].id]);
   assert.ok(stats, 'script operator is in the battle');
@@ -102,6 +135,7 @@ test('script operator: permission child and Worker have byte-identical ev/result
     assert.equal(JSON.stringify(y.ev), JSON.stringify(x.ev)); assert.equal(JSON.stringify(y.snap), JSON.stringify(x.snap));
     assert.equal(JSON.stringify(z.ev),JSON.stringify(x.ev));assert.equal(JSON.stringify(z.snap),JSON.stringify(x.snap));
   }
+  assert.ok(b.combatMetrics().rows.length > 0, 'sandbox plugin battles collect operator statistics');
   assert.equal(JSON.stringify(b.compactResult()), JSON.stringify(a.compactResult()));
   assert.equal(JSON.stringify(native.compactResult()),JSON.stringify(a.compactResult()));
 });

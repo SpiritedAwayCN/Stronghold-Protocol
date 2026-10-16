@@ -116,7 +116,13 @@ export class WorkerSimHost {
     this.meter = packet.meter;
     return packet;
   }
-  async start(spec) { this.spec = spec; this.accept(await this.rpc('start', [spec])); return this; }
+  async start(spec, { combatMetrics = false } = {}) {
+    this.spec = spec;
+    this.accept(await this.rpc('start', [spec, { combatMetrics }]));
+    return this;
+  }
+  combatMetrics() { return this.packet?.combatMetrics ?? null; }
+  stopCombatMetrics() { return this.rpc('stopCombatMetrics').catch(() => {}); }
   async step(n, opts) { return this.accept(await this.rpc('step', [n, opts])); }
   progress() { return this.packet.progress; }
   uniteLeft() { return this.packet.left; }

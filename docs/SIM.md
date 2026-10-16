@@ -44,6 +44,11 @@ server/sim/
 
 ## 1. Driving a battle (match owner)
 
+The optional browser combat statistics panel uses `public/js/battle/metrics.js` to observe effective damage and healing.
+For gameplay-plugin battles, the same collector runs inside `simWorkerRuntime.js` before the first tick; only aggregate
+snapshots cross to the page through `WorkerSimHost`. No combat statistics enter server reports or battle results.
+See [design/client.md](design/client.md#combat-metrics-作战统计--ported-from-the-xinhai-ai-fork-opt-in) for settings and lifetime.
+
 ```js
 import { Battle } from './sim/Battle.js';
 const b = new Battle({

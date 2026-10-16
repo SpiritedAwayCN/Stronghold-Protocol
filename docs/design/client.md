@@ -494,14 +494,16 @@ hook, `battle.heal` is not wrapped). On, the corner's 作战统计 button (`gm__
 modeless panel over the running battle: the fight keeps playing behind it, ✕ / Esc closes it, and the next frame's
 prep keeps it usable.
 
-`battle/metrics.js` (`trackCombat`) attaches in `prepare` only when the setting is on and the host is in-page.
-`screens/game.js` pushes the switch with `setCombatMetrics` (the runner does not import the settings store). A
-gameplay-plugin room (`room.content.vanilla === false`) simulates in a Worker: the page holds wire state only (time
-and ids, no `damaged` hook and no `heal`), so the meter is not attached and the button stays hidden. A cosmetic plugin
-keeps the vanilla content set and the in-page host, so the meter still runs. A `hud.right` ui-slot is a separate node
-and is not gated by this setting. Turning the setting off mid-battle detaches the hook and restores `heal`. Turning it
-on does not backfill a battle already prepared ([ASSUMED]: the hooks would have missed damage already dealt); the next
-battle prepared after the switch is the first one counted.
+`battle/metrics.js` (`trackCombat`) attaches before the first tick only when the setting is on. In-page battles
+attach in `prepare`; gameplay-plugin battles attach inside the simulation Worker at `start`. The Worker returns only
+a compact aggregate snapshot with each simulation packet (seconds, owners, per-operator damage/healing/type totals),
+never engine objects or a per-hit event stream. The runner reads the latest snapshot through the same panel API.
+`screens/game.js` pushes the switch with `setCombatMetrics` (the runner does not import the settings store). Content,
+script and cosmetic plugin rooms all expose the button when the setting is on and the viewer is not a spectator.
+A `hud.right` ui-slot is a separate node and is not gated by this setting. Turning the setting off mid-battle detaches
+the hook and restores `heal` (a Worker RPC does this before its next queued step). Turning it on does not backfill a
+battle already prepared ([ASSUMED]: the hooks would have missed damage already dealt); the next battle prepared after
+the switch is the first one counted.
 
 `combatMetrics({ scope: 'battle' | 'match', ownerId })` sits beside `currentBattle()` on the runner. A row is one
 operator: the effective HP the sim's own counters lost (mitigation, silent damage and DoTs included; overkill, element
