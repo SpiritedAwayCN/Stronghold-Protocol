@@ -240,7 +240,6 @@ function MatchScreen() {
   const [facing, setFacing] = useState(null);            // direction step: { uid, piece, row, col, grid, name }
   const [sel, setSel] = useState(null);                  // tapped own piece: { uid }
   const [selBusy, setSelBusy] = useState(false);
-  const pieceActionBusy = useRef(false);
   const buyPending = useRef(new Set());
   const [holdSeq, setHoldSeq] = useState(0);             // bumped when a held piece is released (re-apply the prep state)
   const [hud, setHud] = useState(null);
@@ -359,7 +358,7 @@ function MatchScreen() {
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
   }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
-  live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
+  live.current = { pub, priv, field, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
   // the own prep board: the normal board, or — in the prep of a boss round — the player's half of the boss field
@@ -1344,33 +1343,25 @@ function MatchScreen() {
   // the gold tile of an armed merge card (mergeAt): the detail card the first tap opened docks away from it (QA 6b — at
   // 1920×1080 the left card covered half of a target tile in the leftmost legal column)
   const mergeGeo = useTileScreen(view, mergeAt ? mergeAt.row : null, mergeAt ? mergeAt.col : null);
-  const retreatPiece = useCallback(async (uid) => {
+  const retreatSel = useCallback(async () => {
     const L = live.current;
-    if (pieceActionBusy.current || !underframeActions(L.placeCtx, uid)?.retreat) return;
+    const uid = L.sel?.uid;
     const to = uid != null ? retreatSlot(L.placeCtx, uid) : null;
     if (!to) { toast(t('整备区已满'), 'warn'); audio.sfx('error', { volume: 0.5 }); return; }
-    pieceActionBusy.current = true;
     setSelBusy(true);
-    try {
-      if (await actions.move(uid, to)) {
-        setSel((s) => s?.uid === uid ? null : s);
-        setDetail((d) => (d?.kind === 'piece' && d.uid === uid ? null : d));
-      }
-    } finally {
-      pieceActionBusy.current = false;
-      setSelBusy(false);
+    if (await actions.move(uid, to)) {
+      setSel(null);
+      setDetail((d) => (d?.kind === 'piece' && d.uid === uid ? null : d));
     }
+    setSelBusy(false);
   }, []);
-  const sellOwnPiece = useCallback(async (uid) => {
-    const e = live.current.placeCtx.pieces.get(uid);
-    if (!e || pieceActionBusy.current) return;
-    pieceActionBusy.current = true;
+  const sellSel = useCallback(async () => {
+    const e = live.current.sel ? live.current.placeCtx.pieces.get(live.current.sel.uid) : null;
+    if (!e) return;
     setSelBusy(true);
-    try { await sellPiece(e.piece); }
-    finally { pieceActionBusy.current = false; setSelBusy(false); }
+    await sellPiece(e.piece);
+    setSelBusy(false);
   }, []);
-  const retreatSel = useCallback(() => retreatPiece(live.current.sel?.uid), [retreatPiece]);
-  const sellSel = useCallback(() => sellOwnPiece(live.current.sel?.uid), [sellOwnPiece]);
 
   // unit clicks from the engine may only carry an id: resolve through m.field / spawn infos
   const detailTarget = useMemo(() => {
@@ -1434,8 +1425,6 @@ function MatchScreen() {
 
   // ---- keyboard ---------------------------------------------------------------------------------------------
   useEffect(() => {
-    // Remember only pointer coordinates. Hit-test again on keydown so moved/removed pieces, overlays,
-    // camera changes and an old click selection cannot redirect a destructive action.
     let pointer = null;
     const trackPointer = (e) => {
       pointer = e.pointerType === 'touch' ? null : { x: e.clientX, y: e.clientY, buttons: e.buttons };
@@ -1512,13 +1501,12 @@ function MatchScreen() {
         return;
       }
       if (act === 'retreat' || act === 'sell') {
-        if (!L.showPrep || L.drag || L.facing || L.selBusy || L.pen || !pointer || pointer.buttons) return;
-        const uid = L.view?.pieceAtClientPoint(pointer.x, pointer.y);
-        const hovered = Number.isInteger(uid) ? L.placeCtx.pieces.get(uid) : null;
-        if (hovered?.piece.kind !== 'chess') return;
-        const available = underframeActions(L.placeCtx, uid);
-        if (act === 'retreat' && available?.retreat) await retreatPiece(uid);
-        else if (act === 'sell' && available?.sell != null) await sellOwnPiece(uid);
+        if (!L.showPrep || L.drag || L.facing || L.selBusy || !L.sel) return;
+        const selected = L.placeCtx.pieces.get(L.sel.uid);
+        if (selected?.piece.kind !== 'chess') return;
+        const available = underframeActions(L.placeCtx, L.sel.uid);
+        if (act === 'retreat' && available?.retreat) await retreatSel();
+        else if (act === 'sell' && available?.sell != null) await sellSel();
         return;
       }
       const reason = shopBlockReason(act, { priv: L.priv, editable: L.editable });
