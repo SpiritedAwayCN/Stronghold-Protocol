@@ -96,7 +96,7 @@ function runPrep(node, ctx, ev, env) {
   if (node.gainItem && typeof node.gainItem === 'object') {
     const id = node.gainItem.item;
     if (typeof id === 'string' && id && typeof ctx.grantItem === 'function') {
-      ctx.grantItem(id, { source: 'plugin:' + env.pluginId });
+      ctx.grantItem(id, { source: 'plugin:' + env.pluginId, ...env.gainItemOptions?.get(node.gainItem) });
     }
   }
 }
@@ -105,7 +105,8 @@ function runPrep(node, ctx, ev, env) {
  * Compile `spec.meta` into a MetaRegistry handler object. Throws when the spec is not valid; the message
  * contains the PLUGIN_DSL_* code. Does not register anything.
  * @param {object} spec
- * @param {{ pluginId?: string, def?: { raw?: { pluginId?: string } } }} [opts]
+ * `gainItemOptions` carries validated operator-trait options separately from the unchanged general DSL grammar.
+ * @param {{ pluginId?: string, def?: { raw?: { pluginId?: string } }, gainItemOptions?: WeakMap<object, { requirePool: boolean }> }} [opts]
  * @returns {object}
  */
 export function compileDslMeta(spec, opts = {}) {
@@ -120,6 +121,7 @@ export function compileDslMeta(spec, opts = {}) {
     chess: null,
     def: null,
     pluginId: host.pluginId,
+    gainItemOptions: opts.gainItemOptions,
     budget: spec.budget != null ? spec.budget : 0,
     spec,
   };

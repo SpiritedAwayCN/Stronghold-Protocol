@@ -109,6 +109,15 @@ export class GameData {
     // (card-pool experiment BV1eLXXBqEgF, maintainer-confirmed 2026-10-11). Random subset gifts are not exempt.
     this._fixedGiftItems = new Set(Object.values(this.raw.garrisons || {})
       .filter(g => g.effectKey === 'SERVER_GAIN_EQUIP').map(g => g.bbStr?.chess).filter(id => this._items[id]));
+    // Trait-declared fixed gifts need the same family classification for acquisition and stock invariants.
+    for (const g of Object.values(this.raw.garrisons || {})) {
+      for (const event of g.operatorTrait?.spec?.meta?.on ?? []) {
+        for (const action of event.do ?? []) {
+          const gift = action.gainItem;
+          if (gift?.requirePool === false && this._items[gift.item]) this._fixedGiftItems.add(this.baseIdOf(gift.item));
+        }
+      }
+    }
     this._bonds = this.raw.bonds && typeof this.raw.bonds === 'object' ? this.raw.bonds : {};
     /** visible, shop-eligible base (normal) chess ids */
     this.visibleChess = Object.keys(chess).filter((id) => {

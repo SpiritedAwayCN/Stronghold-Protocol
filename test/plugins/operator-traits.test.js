@@ -7,10 +7,13 @@ import { checkOperatorTraitRuntime } from '../../public/js/battle/simLoader.js';
 import { installServerOperatorTraits } from '../../server/plugins/operatorTraits.js';
 import { applyRecordOverlay } from '../../shared/i18nData.js';
 import { contentSetFiles } from '../../server/plugins/contentSet.js';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { fixture, guard } from '../helpers/contentFixtures.js';
 import { buildContentSet } from '../../server/plugins/contentSet.js';
 import { validateTraitSpec } from '../../server/plugins/operatorTraits.js';
+import { operatorTraitHandler } from '../../server/match/operatorTraits.js';
+import { validateDsl } from '../../server/sim/content/dsl/validate.js';
 import { installOperatorTraits } from '../../public/js/battle/operatorTraits.js';
 import { loadBrowserSim } from '../../public/js/battle/simLoader.js';
 import { makeBattle } from '../helpers/battleHarness.js';
@@ -67,6 +70,62 @@ test('gain once per acquisition, normal merge-triggering copy grants one, direct
   ps.promote(ps.acquireChess(ID));
   assert.equal(calls.length, 6, 'promotion is not another acquisition');
   assert.deepEqual(h.logs.error, []);
+});
+
+test('trait gainItem requirePool preserves stock defaults and permits only fixed gifts past stock', t => {
+  const r = official(true);
+  delete r.forms;
+  const { set } = put(t, r);
+  const probe = makeMatch({ data: set.data, mode: 'solo', fake: true });
+  const limited = Object.keys(set.data.items).find(id => !probe.m.gd.isGolden(id)
+    && !probe.m.gd.isUnlimitedGiftItem(id) && probe.m.itemPool.cap(id) > 0);
+  assert.ok(limited);
+  assert.equal(probe.m.gd.isUnlimitedGiftItem(ITEM), false, 'omission does not register an unlimited gift');
+  for (const item of [ITEM, limited]) for (const requirePool of [undefined, true, false]) {
+    const spec = gain(2);
+    Object.assign(spec.meta.on[0].do[0].gainItem, { item, ...(requirePool === undefined ? {} : { requirePool }) });
+    const record = official(true); delete record.forms; record.trait.dsl = spec;
+    const data = put(t, record).set.data;
+    const h = makeMatch({ data, mode: 'solo', fake: true }).start(); h.toPrep(1);
+    const ps = h.ps('p_0'), pool = h.m.itemPool;
+    for (let i = 0; i < pool.cap(item); i++) assert.ok(ps.acquireItem(item));
+    assert.equal(pool.left(item), 0);
+    const held = pool.held(item), calls = [];
+    const acquire = ps.acquireItem.bind(ps);
+    ps.acquireItem = (id, opts) => { calls.push({ id, ...opts }); return acquire(id, opts); };
+    ps.acquireChess(ID);
+    assert.equal(calls.length, 2, 'count expands into two grants');
+    for (const call of calls) {
+      assert.equal(call.id, item);
+      assert.equal(call.source, 'plugin:data-demo');
+      assert.equal(call.requirePool, requirePool !== false);
+    }
+    assert.equal(pool.held(item), held + (requirePool === false ? 2 : 0));
+    assert.equal(h.m.gd.isUnlimitedGiftItem(item), requirePool === false);
+    if (item === ITEM) {
+      for (let i = 0; i < pool.cap(limited); i++) assert.ok(acquire(limited));
+      assert.equal(acquire(limited, { requirePool: false }), null, 'unrelated finite families stay limited');
+    }
+    assert.equal(pool.debtOf(item), 0, 'fixed gifts do not create displayed-offer debt');
+    assert.deepEqual(h.logs.error, []);
+  }
+});
+
+test('Ulpian trait fixed gifts grant one or two copies beyond stock and still merge', t => {
+  const record = official(true);
+  record.trait.dsl.meta.on[0].do[0].gainItem.requirePool = false;
+  record.forms.elite.trait.dsl.meta.on[0].do[0].gainItem.requirePool = false;
+  const { set } = put(t, record);
+  for (const [id, count] of [[ID, 1], [ID.replace('_a', '_b'), 2]]) {
+    const h = makeMatch({ data: set.data, mode: 'solo', fake: true }).start(); h.toPrep(1);
+    const ps = h.ps('p_0'), pool = h.m.itemPool;
+    for (let i = 0; i < pool.cap(ITEM); i++) assert.ok(ps.acquireItem(ITEM));
+    assert.equal(pool.left(ITEM), 0);
+    ps.acquireChess(id);
+    assert.equal(pool.held(ITEM), pool.cap(ITEM) + count);
+    assert.ok([...ps.hand, ...ps.temp].some(p => p?.id === ITEM.replace('_a', '_b')), 'ordinary item merging still applies');
+    assert.deepEqual(h.logs.error, []);
+  }
 });
 
 test('prep ownership is player-local, once per character, elite wins, last sale stops it', t => {
@@ -164,6 +223,41 @@ for (const [name, mutate] of Object.entries({
 })) test(`reject invalid trait ${name}`, () => { const spec = burst(); mutate(spec); assert.throws(() => validateTraitSpec(spec, 'data-demo', DATA)); });
 for (const count of [0, -1, 1.5, 65, '2', null]) test(`reject gain count ${count}`, () => assert.throws(() => validateTraitSpec(gain(count), 'data-demo', DATA)));
 
+
+test('trait requirePool is boolean-only in validation and schema; general DSL stays closed', () => {
+  const v = schemaValidator('schemas');
+  for (const requirePool of [true, false, null, 0, 1, 'false', 'true', {}, []]) {
+    const spec = gain(2); spec.meta.on[0].do[0].gainItem.requirePool = requirePool;
+    if (typeof requirePool === 'boolean') {
+      assert.equal(validateTraitSpec(spec, 'data-demo', DATA), spec);
+      assert.deepEqual(v.validate('operator-trait.schema.json', spec), []);
+      spec.meta.on[0].when = 'roundStart';
+      delete spec.meta.on[0].do[0].gainItem.count;
+      assert.equal(validateDsl(spec).ok, false);
+    } else {
+      assert.throws(() => validateTraitSpec(spec, 'data-demo', DATA), { code: 'PLUGIN_DSL_ACTION', path: 'gainItem.requirePool' });
+      assert.ok(v.validate('operator-trait.schema.json', spec).length);
+    }
+  }
+});
+
+test('trait grant options remain action-local across count expansion and cached handlers', () => {
+  const spec = gain(2);
+  spec.meta.on[0].do = [false, undefined, true].map(requirePool => ({ gainItem: {
+    item: ITEM, count: 2, ...(requirePool === undefined ? {} : { requirePool }),
+  } }));
+  const original = structuredClone(spec);
+  validateTraitSpec(spec, 'data-demo', DATA);
+  assert.deepEqual(spec, original, 'validation does not strip options from the author spec');
+  const tr = { spec, pluginId: 'data-demo' }, calls = [];
+  const handler = operatorTraitHandler(tr, 'onTraitGain');
+  assert.equal(operatorTraitHandler(tr, 'onTraitGain'), handler);
+  for (let i = 0; i < 2; i++) handler.onTraitGain({ grantItem: (id, opts) => calls.push({ id, ...opts }) }, {});
+  const expected = [false, false, undefined, undefined, true, true].map(requirePool => ({
+    id: ITEM, source: 'plugin:data-demo', ...(requirePool === undefined ? {} : { requirePool }),
+  }));
+  assert.deepEqual(calls, [...expected, ...expected]);
+});
 
 test('author schemas accept both examples and reject the new invalid fields', () => {
   const v = schemaValidator('schemas');
@@ -336,7 +430,7 @@ test('production match host and an isolated browser module tree agree', { timeou
   const root = f.dir + '/runtime';
   fs.mkdirSync(root + '/server', { recursive: true });
   // Browser /sim has no Node loader: including it creates a cycle through the data shim.
-  fs.cpSync('server/sim', root + '/server/sim', { recursive: true, filter: src => !src.endsWith('/nodeData.js') });
+  fs.cpSync('server/sim', root + '/server/sim', { recursive: true, filter: src => path.basename(src) !== 'nodeData.js' });
   fs.cpSync('shared', root + '/shared', { recursive: true });
   fs.writeFileSync(root + '/package.json', '{"type":"module"}'); fs.writeFileSync(root + '/server/data.js', DATA_SHIM_JS);
   const sim = await loadBrowserSim({ base: pathToFileURL(root + '/server/sim/').href, data: set.data, bounds: set.bounds, cs: set.cs });
@@ -345,7 +439,7 @@ test('production match host and an isolated browser module tree agree', { timeou
   assert.equal(battle.getPlayer('p1').bonds.egirShip.layers, 3);
   const errors = [];
   const hosts = createMatchHosts({ contents, log: { info() {}, warn() {}, error: (...a) => errors.push(a) },
-    options: { matchModule: new URL('./fixtures/scriptBattleMatch.js', import.meta.url).pathname, matchOptions: { scriptSpec: spec } } });
+    options: { matchModule: fileURLToPath(new URL('./fixtures/scriptBattleMatch.js', import.meta.url)), matchOptions: { scriptSpec: spec } } });
   t.after(() => hosts.close());
   let deliver, timer;
   const done = new Promise((resolve, reject) => { deliver = resolve; timer = setTimeout(() => reject(new Error(JSON.stringify(errors))), 20000); });

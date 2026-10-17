@@ -45,10 +45,17 @@ export function operatorTraitHandler(tr, hook) {
   let map = compiled.get(tr);
   if (!map) { map = new Map(); compiled.set(tr, map); }
   if (map.has(hook)) return map.get(hook);
+  const gainItemOptions = new WeakMap();
   const on = (tr.spec.meta?.on ?? []).filter(e => e.when === (hook === 'onGain' ? 'gain' : EVENTS[hook])).map(e => ({ ...e, when: 'roundStart',
-    do: (e.do ?? []).flatMap(action => action.gainItem
-      ? Array.from({ length: action.gainItem.count ?? 1 }, () => ({ gainItem: { item: action.gainItem.item } })) : [action]) }));
-  const result = on.length ? { [hook]: compileDslMeta({ dsl: 1, meta: { on } }, { pluginId: tr.pluginId }).onRoundStart } : {};
+    do: (e.do ?? []).flatMap(action => {
+      if (!action.gainItem) return [action];
+      return Array.from({ length: action.gainItem.count ?? 1 }, () => {
+        const gainItem = { item: action.gainItem.item };
+        if (Object.hasOwn(action.gainItem, 'requirePool')) gainItemOptions.set(gainItem, { requirePool: action.gainItem.requirePool });
+        return { gainItem };
+      });
+    }) }));
+  const result = on.length ? { [hook]: compileDslMeta({ dsl: 1, meta: { on } }, { pluginId: tr.pluginId, gainItemOptions }).onRoundStart } : {};
   map.set(hook, result); return result;
 }
 

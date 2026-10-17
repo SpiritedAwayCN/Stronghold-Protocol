@@ -12,7 +12,7 @@ export const TRAIT_EVENTS = Object.freeze(['gain', 'deploy', 'roundStart', 'buy'
 export const TRAIT_SURFACE = Object.freeze([
   'record.operator.trait.dsl', 'record.operator.overrides.trait', 'dsl.trait.on',
   'dsl.trigger.elementBurst', 'dsl.condition.element', 'dsl.condition.targetOnField', 'dsl.condition.selfOnField',
-  'dsl.layers.maxPerBattle', 'dsl.layers.selfActive', 'dsl.gainItem.count', ...TRAIT_EVENTS.map(e => `dsl.trait.meta.${e}`),
+  'dsl.layers.maxPerBattle', 'dsl.layers.selfActive', 'dsl.gainItem.count', 'dsl.gainItem.requirePool', ...TRAIT_EVENTS.map(e => `dsl.trait.meta.${e}`),
 ].map(name => ({ name, group: 'trait', stability: 'stable', since: '0.3.1', anchor: 'server/plugins/operatorTraits.js#TRAIT_SURFACE' })));
 
 export const hasOperatorTrait = r => r?.trait?.dsl !== undefined || r?.kit?.dsl?.trait?.on !== undefined
@@ -93,7 +93,9 @@ export function validateTraitSpec(spec, pluginId, data = null) {
           if (typeof b.item !== 'string' || !b.item || data && !Object.hasOwn(data.items ?? {}, b.item)) fail('gainItem.item', 'existing item required', 'PLUGIN_DATA_REFERENCE');
           // [ASSUMED] Bounded grants, same inventory/pool/merge rules as official item acquisition.
           if (b.count !== undefined && (!Number.isInteger(b.count) || b.count < 1 || b.count > 64)) fail('gainItem.count', 'integer 1..64 required', 'PLUGIN_DSL_NUMBER');
+          if (Object.hasOwn(b, 'requirePool') && typeof b.requirePool !== 'boolean') fail('gainItem.requirePool', 'boolean required', 'PLUGIN_DSL_ACTION');
           delete b.count;
+          delete b.requirePool;
         }
         walk(action);
       }

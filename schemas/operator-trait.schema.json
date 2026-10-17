@@ -1719,6 +1719,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 64
+        },
+        "requirePool": {
+          "type": "boolean",
+          "default": true,
+          "description": "False registers this fixed item family as an unlimited operator gift; produced items still occupy stock and follow normal inventory and merge rules."
         }
       }
     },
