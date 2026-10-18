@@ -617,7 +617,9 @@ Operator trait declarations are content-only additions in 0.3.1 (#671): see PLUG
 `schemas/operator-trait.schema.json`. The loader validates this extension before delegating the legacy grammar;
 legacy `validateDsl`/`compileDsl` remain unchanged. The app-owned setup adapter is internal, not an author scripting API.
 
-Trait gain is discoverable through SERVER_GAIN and supports forced dispatch separately from acquisition. Self-sale
+Trait gain is discoverable through SERVER_GAIN and supports forced dispatch separately from acquisition. Both actual
+and forced gain automatically repeat their actions with the official investor multiplier (active ×2, ≥100 layers ×3,
+otherwise ×1), without multiplying acquisition counts or other trait hooks. Self-sale
 uses the sold form, including the last copy [ASSUMED]. Layer actions preserve garrison attribution and the existing
 cooldown tolerance; affected fields require server authority [ASSUMED]. No new author API names are introduced.
 

@@ -81,6 +81,7 @@ export function dispatchOperatorTraits(dispatcher, ps, hook, ev) {
     const tr = g.operatorTrait, holder = holders.get(tr.charId);
     if (!holder || tr.elite !== !!holder.rec.isGolden) continue;
     const key = `trait:${g.garrisonId}`;
-    dispatcher._call(ps, key, operatorTraitHandler(tr, hook), hook, { kind: 'garrison', key, piece: holder.piece, garrison: g }, ev);
+    const repeat = hook === 'onTraitGain' ? dispatcher.investRepeat(ps) : 1;
+    dispatcher._call(ps, key, operatorTraitHandler(tr, hook), hook, { kind: 'garrison', key, piece: holder.piece, garrison: g }, ev, repeat);
   }
 }

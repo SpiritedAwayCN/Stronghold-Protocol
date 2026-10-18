@@ -20,7 +20,7 @@ import { makeBattle } from '../helpers/battleHarness.js';
 import { DataSource } from '../../server/sim/simdata.js';
 import { setGameData } from '../../server/sim/content/support/index.js';
 import { elementBurst } from '../../server/sim/damage.js';
-import { makeMatch, legalTileFor, DATA } from '../match/harness.js';
+import { makeMatch, legalTileFor, give, DATA } from '../match/harness.js';
 
 const CHAR = 'char_4145_ulpia', ID = 'chess_char_5_05_a', ITEM = 'chess_item_3_07_e_a';
 const gain = count => ({ dsl: 1, meta: { on: [{ when: 'gain', do: [{ gainItem: { item: ITEM, count } }] }] } });
@@ -70,6 +70,49 @@ test('gain once per acquisition, normal merge-triggering copy grants one, direct
   ps.promote(ps.acquireChess(ID));
   assert.equal(calls.length, 6, 'promotion is not another acquisition');
   assert.deepEqual(h.logs.error, []);
+});
+
+test('acquired trait gain repeats all actions with investors without multiplying acquisition or other hooks', t => {
+  const r = official(true);
+  for (const form of [r, r.forms.elite]) {
+    form.trait.dsl.meta.on[0].do[0].gainItem.requirePool = false;
+    form.trait.dsl.meta.on[0].do.push({ funds: { amount: 7 } }, { layers: { bond: 'egirShip', amount: 2 } });
+    form.trait.dsl.meta.on.push({ when: 'roundStart', do: [{ funds: { amount: 7 } }] });
+  }
+  const { set } = put(t, r);
+  const investors = Object.values(set.data.chess).filter(c => c.visible && !c.isGolden && c.bonds?.includes('investShip'));
+  for (const [difficulty, members, layers, repeat] of [
+    ['FUNNY', 3, 100, 1], ['NORMAL', 2, 100, 1],
+    ['NORMAL', 3, 0, 2], ['NORMAL', 3, 99, 2], ['NORMAL', 3, 100, 3],
+  ]) {
+    const h = makeMatch({ data: set.data, mode: 'solo', difficulty, fake: true }).start(); h.toPrep(1);
+    t.after(() => h.m.dispose());
+    const ps = h.ps('p_0');
+    for (const c of investors.slice(0, members)) give(h.m, ps, c.chessId);
+    ps.layers.investShip = layers; ps.recompute();
+    assert.equal(h.m.dispatcher.investRepeat(ps), repeat);
+    const calls = [], acquire = ps.acquireItem.bind(ps);
+    ps.acquireItem = (id, opts) => { if (opts?.source === 'plugin:data-demo') calls.push(id); return acquire(id, opts); };
+    let expected = 0;
+    for (const [id, source, count] of [[ID, 'buy', 1], [ID, 'reward', 1], [ID, 'grant', 1], [ID.replace('_a', '_b'), 'grant', 2]]) {
+      const funds = ps.funds, bondLayers = ps.layers.egirShip || 0, gained = ps.round.gainedChess;
+      assert.ok(ps.acquireChess(id, { source }));
+      expected += count * repeat;
+      assert.equal(calls.length, expected, `${difficulty}/${members}/${layers}: ${source}/${id}`);
+      assert.equal(ps.funds - funds, 7 * repeat);
+      assert.equal(ps.layers.egirShip - bondLayers, 2 * repeat);
+      assert.equal(ps.round.gainedChess - gained, 1);
+    }
+    const piece = ps.allChess().find(p => p.id === ID.replace('_a', '_b'));
+    assert.equal(h.m.dispatcher.triggerGarrisons(ps, piece, 'SERVER_GAIN'), 1);
+    expected += 2 * repeat;
+    assert.equal(calls.length, expected, 'forced gain applies the multiplier once');
+    const funds = ps.funds;
+    h.m.dispatch(ps, 'onRoundStart', {});
+    assert.equal(ps.funds - funds, 7, 'non-gain traits do not repeat');
+    assert.deepEqual(h.logs.error, []);
+    h.invariants();
+  }
 });
 
 test('trait gainItem requirePool preserves stock defaults and permits only fixed gifts past stock', t => {
