@@ -255,6 +255,18 @@ can copy its `operator/arts/`. `fetch`, `layout`, and `portraits --source=net` a
 `inject` always uses existing resources and cached official metadata, while the official packer derives animation
 roles, numbered skill clips, events and bounds. Missing pictures/models are omitted so the normal fallback remains.
 `normalize` repairs local atlas page names; `verify --fix` rebuilds the emitted lock, never the base manifest.
+Skin resolution and plugin emission reject the dorm-only signature (`Default` at 0 s, `Relax`/`Sit`/`Sleep`,
+without `Idle`/`Attack`) instead of mapping a static setup pose to battle roles. Rejected imports leave existing
+packs intact. This is a narrow guard, not a complete validator for every upstream layout.
+
+For Leonhardt's `char_373_lionhd@snow#3` (希望巡游), the affected local Front skeleton matched the upstream
+`Spine` dorm model, while Back was the correct battle model. The dorm model resolves Idle/Attack/Skill to the
+zero-duration `Default` pose; it cannot supply battle animation or the battle face attachments. Repair all three
+Front files (`.skel`, `.atlas`, `.png`) together from the upstream `Front` directory, then re-pack the plugin.
+The battle Front has `Idle` (2.667 s), `Attack` (1.1 s), `Skill` (1.067 s), `Start` (1 s) and `Die` (1 s).
+Rebuilding a lock alone cannot repair the wrong source files. Local art and plugin locks remain ignored; installations
+with the old pack need their own asset repair and re-pack, followed by a server restart to reload the catalogue
+and a browser reload. No shared renderer or simulation changes are needed.
 
 For this migration, the actual changed skin records of `9c06c76f` can be imported without adopting its generated
 manifest or its other changes:

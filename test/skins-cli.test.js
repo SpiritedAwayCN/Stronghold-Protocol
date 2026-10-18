@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { emitSkinPlugin, emitSkinPlugins, skinPluginDir, verifySkinPlugin } from '../tools/skins-plugin.mjs';
+import { emitSkinPlugin, emitSkinPlugins, skinPluginDir, verifySkinPlugin, skinModelProblem } from '../tools/skins-plugin.mjs';
 import { catalogueJobs, officialNameOf, tokenSkinMapOf, tokenSkinFileJobs, sourceJobs } from '../tools/skins.mjs';
 import { spineEntry, tokenSkinOwner } from '../public/js/assets.js';
 import { locateAssetPath, readAssetOverlay } from '../shared/plugins/visual.js';
@@ -27,6 +27,8 @@ test('CLI is manual, offline-safe, and does not expose a generated-data output',
   assert.equal(run('fetch', '--offline').status, 2);
   assert.equal(run('plan', '--offline', '--probe').status, 2);
   assert.throws(() => skinPluginDir(ROOT, 'data'), /plugins/);
+  assert.match(skinModelProblem({ animations: ['Default', 'Relax', 'Sit', 'Sleep'], durations: { Default: 0 } }), /Dorm-only/);
+  assert.equal(skinModelProblem({ animations: ['Idle', 'Attack'], durations: { Idle: 2, Attack: 1 } }), '');
 });
 
 test('offline catalogue and official token maps preserve exact skin ids and all file alternatives', async () => {
@@ -98,6 +100,15 @@ test('emitter copies only existing art, rewrites unsafe dump filenames, packs an
     fs.appendFileSync(path.join(out, image), Buffer.from([1]));
     assert.ok(verifySkinPlugin({ root: ROOT, output: out }).problems.length > 0, 'changed art invalidates its lock');
     assert.equal(verifySkinPlugin({ root: ROOT, output: out, fix: true }).problems.length, 0);
+    fs.writeFileSync(path.join(art, 'outfit#1.skel'), skel({ animations: {
+      Default: [], Relax: [['OnStart', 2]], Sit: [['OnStart', 4]], Sleep: [['OnStart', 3]],
+    } }));
+    const packedBefore = fs.readFileSync(path.join(out, 'plugin.lock.json'));
+    for (const dryRun of [true, false]) {
+      assert.throws(() => emitSkinPlugin({ root: ROOT, source, output: out, dryRun }), /Dorm-only skin skeleton/);
+      assert.deepEqual(fs.readFileSync(path.join(out, 'plugin.lock.json')), packedBefore, 'reject before replacing an existing pack');
+    }
+    fs.writeFileSync(path.join(art, 'outfit#1.skel'), skel());
     const second = { ...source, chars: { ...source.chars, char_103_angel: source.chars.char_102_texas } };
     const split = emitSkinPlugins({ root: ROOT, source: second, output: out, maxBytes: 1 });
     assert.equal(split.results.length, 2, 'large collections split at operator boundaries');

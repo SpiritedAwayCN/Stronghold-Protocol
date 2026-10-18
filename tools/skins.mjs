@@ -3,7 +3,7 @@
 
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { emitSkinPlugins, verifySkinPlugins } from './skins-plugin.mjs';
+import { emitSkinPlugins, verifySkinPlugins, skinModelProblem } from './skins-plugin.mjs';
 import { readFile, writeFile, mkdir, stat, rename, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -381,6 +381,8 @@ export async function resolveSkinSpine(charId, stem, side, urls, opts = {}) {
   try { info = atlasInfo(await readFile(atlasFile, 'utf8')); } catch (e) { return { entry: null, why: `atlas 解析失败: ${e.message}` }; }
   let sk;
   try { sk = parseSkel(await readFile(skelFile), info.regions); } catch (e) { return { entry: null, why: `skel 解析失败: ${e.message}` }; }
+  const problem = skinModelProblem(sk);
+  if (problem) return { entry: null, why: problem };
   if (!sk.animations || !sk.animations.length) return { entry: null, why: '骨骼没有动画' };
   // `resolveRoles` 直接返回 roles 对象（tools/assets/anim-roles.mjs:298-311），生产管线也是 `const anims = resolveRoles(...)`
   const anims = resolveRoles(sk.animations, { skillIndices: opts.skillIndices, numberedSkills: SKIN_NUMBERED_SKILLS, durations: sk.durations });
@@ -905,6 +907,8 @@ export async function resolveSkinSpineFromDisk(charId, stem, side, opts = {}) {
   let sk;
   try { sk = parseSkel(await readFile(join(dir, skelName)), info.regions); } catch (e) { return { entry: null, why: `skel 解析失败: ${e.message}` }; }
   if (!sk.animations || !sk.animations.length) return { entry: null, why: '骨骼没有动画' };
+  const problem = skinModelProblem(sk);
+  if (problem) return { entry: null, why: problem };
   const anims = resolveRoles(sk.animations, { skillIndices: opts.skillIndices, numberedSkills: SKIN_NUMBERED_SKILLS, durations: sk.durations });
   if (!anims || typeof anims !== 'object' || !anims.idle) return { entry: null, why: 'anims 解析不出（骨骼的动画名不认识）' };
   const base = `/assets/spine/op/${charId}/${stem}/${side}`;

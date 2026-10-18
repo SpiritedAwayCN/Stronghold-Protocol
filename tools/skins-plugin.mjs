@@ -8,6 +8,15 @@ import { packPlugin, checkPluginFolder, buildPluginLock } from '../server/plugin
 import { readVanillaAssets } from '../server/plugins/registry.js';
 import { normalizeAtlas } from './assets/atlas.mjs';
 import { pngSize } from './assets/formats.mjs';
+import { parseSkel } from './assets/skel.mjs';
+
+export function skinModelProblem(sk) {
+  const names = new Set(sk.animations || []);
+  return names.has('Default') && sk.durations?.Default === 0
+    && ['Relax', 'Sit', 'Sleep'].every((name) => names.has(name))
+    && !names.has('Idle') && !names.has('Attack')
+    ? 'Dorm-only skin skeleton: use the battle Front/Back resources instead of Spine/build' : '';
+}
 
 export function skinPluginDir(root, output = 'plugins/local-skins') {
   const dir = path.resolve(root, output);
@@ -78,6 +87,8 @@ export function emitSkinPlugin({ root, source, output, dryRun = false }) {
     const skel = image(sp.skel), atlas = image(sp.atlas);
     const textures = Array.isArray(sp.textures) ? sp.textures.map(image) : [];
     if (!skel || !atlas || !textures.length || textures.some((p) => !p)) return null;
+    const problem = skinModelProblem(parseSkel(fs.readFileSync(files.get(skel))));
+    if (problem) throw new Error(`${skel}: ${problem}`);
     return { skel, atlas, textures, pma: !!sp.pma };
   };
   const chars = {};
