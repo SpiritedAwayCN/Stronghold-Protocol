@@ -50,6 +50,8 @@
 // skill with its own idle clip (those attacks go straight back to that idle). The skill's end clip closes the skill,
 // not each attack while it runs.
 
+import { operatorSkillRole } from './skillAttack.js';
+
 const clampN = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
 /** Longest wind-up compression (× the rhythm speed) when the look-ahead is shorter than the natural wind-up. */
@@ -387,9 +389,11 @@ export class SpineActor {
   /**
    * @param {any} spineData PIXI.spine skeleton data
    * @param {object} entry manifest Spine entry (anims, animations, hits, bounds, pma)
+   * @param {string|null} charId effective operator body, including a cosmetic model
    */
-  constructor(spineData, entry) {
+  constructor(spineData, entry, charId = null) {
     const P = globalThis.PIXI;
+    this.charId = charId;
     this.entry = entry;
     this.roles = entry.anims || {};
     this.durations = entry.animations || {};
@@ -477,7 +481,8 @@ export class SpineActor {
   /** The unit's own roles (the manifest's, its skill slot's clip and the Run cycle applied) under the form in force. */
   _applyRoles() {
     const anims = this.entry?.anims || {};
-    const clip = Number.isInteger(this.skillIndex) && anims.skills ? anims.skills[String(this.skillIndex)] : null;
+    const clip = operatorSkillRole(anims, this.charId, this.skillIndex)
+      || (Number.isInteger(this.skillIndex) && anims.skills ? anims.skills[String(this.skillIndex)] : null);
     const run = this.runMode && anims.run ? anims.run : null;
     const base = clip || run ? { ...anims } : anims;
     if (clip) base.skill = clip;
@@ -582,8 +587,15 @@ export class SpineActor {
     return this._idleName();
   }
 
+  _usesUnmixedPose() {
+    // 驭浪 WR04 changes attachment coordinate frames between clips. Blending its hip translations while
+    // attachments switch immediately displaces the body ~900 skeleton units. Keep the authored poses intact.
+    return /(?:^|[/\\])char_263_skadi_summer_3(?:[/\\.]|$)/.test(this.entry.skel || '');
+  }
+
   _play(name, loop, { timeScale = 1, mix, track = 0, start = 0 } = {}) {
     if (!this.has(name)) return false;
+    if (this._usesUnmixedPose()) mix = 0;
     const st = this.spine.state;
     const e = st.setAnimation(track, name, loop);
     if (e) {
@@ -598,6 +610,12 @@ export class SpineActor {
 
   _queue(name, loop, timeScale = 1) {
     if (!this.has(name)) return false;
+    if (this._usesUnmixedPose()) {
+      let last = this.spine.state.tracks[0];
+      while (last?.next) last = last.next;
+      // Set the pair before queueing: Spine subtracts the mix duration when calculating the queue's delay.
+      if (last) this.spine.stateData.setMix(last.animation.name, name, 0);
+    }
     const e = this.spine.state.addAnimation(0, name, loop, 0);
     if (e) e.timeScale = timeScale;
     this._applied = false;

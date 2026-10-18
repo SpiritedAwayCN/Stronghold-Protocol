@@ -13,6 +13,23 @@ Outfits following that body and live refresh timing are cosmetic UI assumptions;
 Summon models follow their owner's selected outfit and `otherSkins`; missing mappings retain default models.
 Summons retain their own VFX mounting points.
 
+Utage's unnumbered Skill stance belongs to S1 only. S2 uses the selected model's ordinary attack role,
+including cosmetic plugin skeletons whose name-derived metadata assigns Skill to all slots. Apply the existing
+base-manifest correction by effective charId and equipped slot before entering the skill; replacing only the
+attack clip would still play the wrong Begin/Loop/End. No effects index or plugin repack is required.
+[ASSUMED] Outfits inherit this S1/S2 distinction; the current effects index lacks full AnimatorHooker and
+skin animation replacement tables, so unverified operators keep their existing roles. See [ASSETS.md](../ASSETS.md).
+
+**Skadi 驭浪 WR04 coordinates.** `SpineActor` disables cross-clip mixing when `entry.skel` matches
+`/(?:^|[/\\])char_263_skadi_summer_3(?:[/\\.]|$)/` (skeleton directory or filename stem, both sides),
+not by skin ID or effective charId. This skeleton switches attachments between different coordinate frames;
+blending their bone translations displaces the body even though each authored pose stays near its feet.
+[ASSUMED] Play whole authored poses for this model: `_play` forces zero mix and `_queue` sets the animation
+pair's mix to zero before Spine calculates the queue delay, preserving the outgoing clip's full duration.
+Other skeleton paths retain existing mixing. World placement, scale, skill roles and gameplay are unchanged.
+Evidence and regression commands: [0.3.1 history](../history/0.3.1.md#skadi-驭浪-wr04-coordinate-mixing);
+reference: [SKINS.md](../SKINS.md).
+
 **Studio test console (0.3.1).**
 
 The maintainer's standalone battle sandbox is `/studio/console.html` (history §34.8; format and limits in

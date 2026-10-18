@@ -71,6 +71,16 @@ Other outfits retain their existing playback. To revert only this policy, remove
 in `public/js/render/vfx/wiring.js` and its regression test in `test/render/vfx-skins.test.js`; no art regeneration or
 simulation/golden changes are required.
 
+For Skadi's `char_263_skadi@summer#3` (驭浪 WR04), `SpineActor` disables cross-clip mixing for
+`char_263_skadi_summer_3` on both sides. The local skeleton's attachment switches change coordinate frames:
+its authored Idle/Attack poses stay near the feet, but interpolating bone translations while attachments switch
+immediately moves the first Attack frames roughly 900 skeleton units upper-right. Real-runtime vertex tests and
+Chrome pixel extraction reproduce the displacement with mixing and eliminate it without mixing. [ASSUMED] Playing
+whole authored poses is this renderer's transition policy; other models retain their mixes. Queued transitions use
+zero mix before Spine calculates their delay, preserving the outgoing clip's full duration. No world-position,
+scale, skill-role, art or gameplay changes are involved. Regression tests: `test/render/spine-coordinate-mix.test.js`
+and the optional Chrome/local-assets `test/render/spine-coordinate-mix.browser.test.js`.
+
 ## 设置「显示其他玩家的皮肤」 (default on)
 
 A pure client preference (`settings.otherSkins`, `sp.pref.settings`; **never sent**):

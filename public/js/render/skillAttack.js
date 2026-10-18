@@ -5,6 +5,18 @@
 import { resolveSkill, skillRecordOf } from './vfx/skills.js';
 
 /**
+ * Utage's unnumbered Skill family is S1's non-attacking stance, never S2's deployment buff.
+ * The base manifest fixes this at build time (PREFAB_SPINE_ROLES); cosmetic plugin locks resolve
+ * names without that character context. Apply the same verified distinction to the selected body.
+ * [ASSUMED] Official S2 mode uses Attack; outfits retain their own ordinary attack role.
+ */
+export function operatorSkillRole(anims, charId, index) {
+  const slot = Number.isInteger(index) ? index : anims.skill?.index;
+  if (charId !== 'char_337_utage' || slot !== 1 || !anims.attack?.loop) return null;
+  return { ...anims.attack, via: 'attack', index: 1, idle: null };
+}
+
+/**
  * The legacy effects index omits mode AnimatorHooker._replaceAnimPairs and skin _animations.
  * Do not generalize its raw animKey to other units: e.g. Humus S2 remaps Attack to Skill_2_Loop,
  * Gavial the Invincible S3 to Skill_3. Blemishine's complete mapping above has been checked.

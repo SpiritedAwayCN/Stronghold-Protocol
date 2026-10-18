@@ -360,6 +360,11 @@ remain local; no official scene bytes belong in git or fixtures.
     mode's Attack / Attack_Down, S3 Skill_3; this does not request the optional effects index. Her Skill_2 has
     OnAttack and therefore needs that verified mapping even without the index. Every other skill keeps its
     existing role logic (held loops, own strikes, skill idles), with or without the index.
+    Utage S2 additionally applies her existing ordinary-attack role correction at runtime to cosmetic models;
+    her unnumbered Skill_Start / Skill_Loop / Skill_End belongs to S1 only. Plugin locks resolve all three slots
+    by name, so they can incorrectly assign this family to S2 even though the base manifest is already corrected.
+    The override follows the effective charId and slot, uses the selected model's ordinary attack, and does not
+    require effects, mutate shared metadata, or change S1. Other operators still require verified mappings.
     Raw effects-index animKey values are not generally skeleton clip names: mode `_replaceAnimPairs` and skin
     `_animations` are not exported by the current index. Other indexed skills retain their existing roles until
     those mappings are available [ASSUMED]. No manifest or skeleton metadata is rewritten.

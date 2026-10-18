@@ -931,7 +931,8 @@ export class UnitView {
       this._retryAt = 0;
       let actor = null;
       try {
-        actor = new SpineActor(data, entry);
+        actor = new SpineActor(data, entry, this.info.kind === 'op'
+          ? this.info.diy?.charId || this.info.spine || this.ctx.lookupDef?.(this.info)?.charId : null);
         actor.setSkillIndex(this.skillIndex ?? undefined);
         // Query at attack time: late index loads, skill slots and facing changes need no new model or request.
         actor.skillAttackMode = () => {

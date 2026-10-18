@@ -8,6 +8,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveRoles } from '../tools/assets/anim-roles.mjs';
 import { applyRoleFix, PREFAB_SPINE_ROLES } from '../tools/assets/spine.mjs';
+import { installFakePixi, fakeViewCtx } from './render/fakepixi.js';
+import { presetCamera } from '../public/js/render/projection.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CLIPS = ['Attack', 'Die', 'Idle', 'Skill_End', 'Skill_Loop', 'Skill_Start', 'Start'];
@@ -23,6 +25,52 @@ test('宴: the resolver alone gives both skill indices the sit-down set; the rol
   assert.equal(roles.skills['1'].via, 'attack', "via 'attack': the renderer plays no skill clip (render/spine.js)");
   assert.equal(roles.skill.index, 1, 'the primary (equipped by default) skill is S2');
   assert.equal(roles.skill.via, 'attack');
+});
+
+test('宴 cosmetic plugin roles: S2 never enters S1 stance, including skill slot and form resets', async () => {
+  const fake = installFakePixi();
+  try {
+    const { SpineActor } = await import('../public/js/render/spine.js');
+    // Same options as plugin skeletonClipData: no character-specific build fix.
+    const anims = resolveRoles(CLIPS, { skillIndices: [0, 1, 2], durations });
+    const entry = { anims, animations: durations };
+    const make = (id) => new SpineActor({ animations: CLIPS.map(name => ({ name })) }, entry, id);
+    const a = make('char_337_utage');
+    a.setSkillIndex(1);
+    a.setSkill(true);
+    assert.equal(a.current, 'Idle', 'deployment buff never plays Skill_Start');
+    assert.equal(a.roles.skill.via, 'attack');
+    for (let n = 0; n < 3; n++) {
+      a.attack(1);
+      assert.equal(a.current, 'Attack');
+      a.update(2);
+      assert.equal(a.current, 'Idle');
+    }
+    a.setForm({ idle: 'Start' });
+    a.setForm(null);
+    assert.equal(a.roles.skill.loop, 'Attack');
+    a.setSkill(false);
+    a.setSkillIndex(0);
+    a.setSkill(true);
+    assert.equal(a.current, 'Skill_Start', 'S1 still enters its non-attacking stance');
+    assert.equal(a.roles.skill.loop, 'Skill_Loop');
+    assert.equal(a._attackClip(), null, 'S1 stance has no attack clip');
+    const other = make('char_other');
+    other.setSkillIndex(1);
+    assert.equal(other.roles.skill.loop, 'Skill_Loop', 'unverified operators keep their roles');
+    assert.equal(anims.skills['1'].loop, 'Skill_Loop', 'cached/shared metadata is not mutated');
+    const { UnitView } = await import('../public/js/render/units.js');
+    const ctx = fakeViewCtx(fake.P, {
+      cam: () => presetCamera('normal', { width: 1280, height: 720 }),
+      assets: { picture: () => null, spineEntry: () => entry,
+        spine: { acquire: async () => ({ animations: CLIPS.map(name => ({ name })) }), release() {} } },
+    });
+    const view = new UnitView(ctx, { id: 1, kind: 'op', side: 'ally', spine: 'char_337_utage',
+      skin: 'char_337_utage@summer#4', skillIndex: 1, maxHp: 100 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(view.actor.roles.skill.loop, 'Attack', 'UnitView passes the effective body for skin models');
+    view.destroy();
+  } finally { fake.restore(); }
 });
 
 test('宴: the shipped manifest carries the fix on both models', () => {
