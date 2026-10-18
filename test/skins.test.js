@@ -306,7 +306,7 @@ describe('皮肤: the lobby seat and the match', () => {
       for (const ent of readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, ent.name);
         if (ent.isDirectory()) walk(p);
-        else if (ent.name.endsWith('.js') && readFileSync(p, 'utf8').includes('.skin')) hits.push(path.relative(ROOT, p));
+        else if (ent.name.endsWith('.js') && readFileSync(p, 'utf8').includes('.skin')) hits.push(path.relative(ROOT, p).split(path.sep).join('/'));
       }
     };
     walk(root);
@@ -415,10 +415,11 @@ describe('皮肤: the client never sends more than the wire accepts', () => {
     assert.equal(Object.keys(kept).length, SKIN_LIMITS.entries);
     assert.deepEqual(Object.keys(kept), Object.keys(big).slice(0, SKIN_LIMITS.entries));
     assert.ok(isSkinSelection(kept), 'what it yields is what the server stores');
-    // a pair that is not a pair does not spend the budget (the first 160 KEPT entries are what fit)
-    const junk = { '': 'x', a: '', b: 7, c: null };
+    // Invalid identifiers do not spend the budget; only protocol-valid entries are synced.
+    const junk = { '': 'x', a: 'skin', chess_char_1_01_a: `${OPERATOR}@s#0`, [OPERATOR]: 'has space' };
     for (let i = 0; i < SKIN_LIMITS.entries; i++) junk[`char_${i}_x`] = `${OPERATOR}@s#${i}`;
     assert.equal(Object.keys(parseStoredSkins(junk)).length, SKIN_LIMITS.entries);
+    assert.ok(isSkinSelection(parseStoredSkins(junk)));
   });
 
   test('room.skins goes out at the limit however the store was filled (installSkinsSync)', async () => {

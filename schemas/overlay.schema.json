@@ -721,6 +721,27 @@
             }
           },
           "additionalProperties": false
+        },
+        "tokens": {
+          "type": "object",
+          "description": "Summon models selected by this operator outfit (official tokenSkinMap).",
+          "propertyNames": {
+            "$ref": "#/$defs/assetKey"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "tokenSkinId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "spine": {
+                "$ref": "#/$defs/spine"
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

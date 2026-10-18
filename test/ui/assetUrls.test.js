@@ -80,6 +80,25 @@ describe('assetUrls', () => {
     }
     assert.equal(official, 258);
   });
+  test('shop portraits follow the effective operator skin, with golden and missing-art fallbacks', () => {
+    const op = 'char_172_svrash', skin = `${op}@snow#1`;
+    const manifest = { chars: {
+      [op]: { portrait: '/base.png', portraitE2: '/base-e2.png', skins: {
+        [skin]: { portrait: '/skin.png', portraitE2: '/skin-e2.png' },
+        illustOnly: { illust: '/skin-illust.png' },
+        modelOnly: { spine: {} },
+      } },
+      char_103_angel: { portrait: '/standin.png' },
+    } };
+    const record = { charId: op, assets: { portrait: `${op}_1` } };
+    assert.equal(chessPortraitUrl(manifest, record, skin), '/skin.png');
+    assert.equal(chessPortraitUrl(manifest, { ...record, isGolden: true }, skin), '/skin-e2.png');
+    assert.equal(chessPortraitUrl(manifest, record, 'illustOnly'), '/skin-illust.png');
+    assert.equal(chessPortraitUrl(manifest, record, 'modelOnly'), '/base.png');
+    assert.equal(chessPortraitUrl(manifest, record, 'missing'), '/base.png');
+    assert.equal(chessPortraitUrl(manifest, record, null), '/base.png');
+    assert.equal(chessPortraitUrl(manifest, { charId: 'char_103_angel' }, skin), '/standin.png');
+  });
   test('bonds, bands, items, enemies, tokens, factions, titles, effects', () => {
     for (const id of Object.keys(load('bonds.json'))) assert.ok(bondIconUrl(m, id), id);
     for (const id of Object.keys(load('bands.json'))) assert.ok(bandIconUrl(m, id), id);

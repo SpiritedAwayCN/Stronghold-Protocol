@@ -30,7 +30,25 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 // what composes a set's document loads with the first document (cosmetics.js loadVisual): here before any layer is laid
 await loadVisual();
 
+test('local skin packs default on only when no personal preference was saved', async () => {
+  assert.deepEqual(personal.get().ids, ['local-skins', 'local-skins-2']);
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  try {
+    for (const ids of [[], ['local-skins'], ['another-look']]) {
+      Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+        getItem: key => key === 'sp.pref.cosmetics' ? JSON.stringify(ids) : null,
+      } });
+      const fresh = await import(`../../public/js/content.js?saved=${encodeURIComponent(JSON.stringify(ids))}`);
+      assert.deepEqual(fresh.personal.get().ids, ids, 'explicit selections, including off, survive reload');
+    }
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    else delete globalThis.localStorage;
+  }
+});
+
 test('P9: active content names installed companion art only while it is off for this player and room', () => {
+  const before = [...personal.get().ids];
   const play = { id: 'play-demo', class: 'content', optional: { 'look-demo': '1.0.0', missing: '*', ui: '*' } };
   const look = { id: 'look-demo', class: 'cosmetic', status: 'loaded', scope: ['personal', 'room'], version: '1.0.0', name: 'Look demo' };
   const entries = [play, look, { id: 'ui', class: 'ui', status: 'loaded' }];
@@ -40,7 +58,7 @@ test('P9: active content names installed companion art only while it is off for 
   assert.deepEqual(companionCosmeticHints({ ...play, optional: undefined }, entries, new Set()), []);
   assert.deepEqual(companionCosmeticHints({ ...play, class: 'cosmetic' }, entries, new Set()), []);
   assert.deepEqual(companionCosmeticHints(play, [play, { ...look, version: '2.0.0' }], new Set()), []);
-  assert.deepEqual(personal.get().ids, [], 'the hint never changes personal switches');
+  assert.deepEqual(personal.get().ids, before, 'the hint never changes personal switches');
 });
 const BASE = { version: 1, chars: { char_102_texas: { avatar: '/assets/~1111111111111111/texas.png' }, char_112_siege: { avatar: '/assets/siege.png' } } };
 const fileSha = (id, rel) => sha256Hex(`${id}:${rel}`);

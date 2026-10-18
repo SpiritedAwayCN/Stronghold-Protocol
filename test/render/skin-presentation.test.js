@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderInfo } from '../../public/js/render/app/info.js';
+import { tokenSkinOwner } from '../../public/js/assets.js';
 
 const source = readFileSync(new URL('../../public/js/render/app.js', import.meta.url), 'utf8');
 const OP = 'char_498_inside', SKIN = `${OP}@kitchen#2`;
@@ -11,7 +12,7 @@ const bodyOf = (name) => {
   return start < 0 ? '' : source.slice(start, source.indexOf('\n  }', start) + 4);
 };
 
-function fixture() {
+function fixture(assets = null) {
   const start = source.indexOf('  const skinOf = ');
   const end = source.indexOf('\n\n', source.indexOf('  const shownSkin = ', start));
   const s = source.indexOf('    setSettings(s) {');
@@ -23,7 +24,7 @@ function fixture() {
     setWorld() {}
     setDir() {}
   }
-  const factory = new Function('renderInfo', 'ctx', 'settings', 'infos', 'views', 'dropView', 'UnitView', `
+  const factory = new Function('renderInfo', 'ctx', 'settings', 'infos', 'views', 'dropView', 'UnitView', 'tokenSkinOwner', 'assets', `
     let mode = 'battle', lastPrep = null;
     const board3d = null;
     function resize() {} function syncOfficialFx() {} function heightAt() { return 0; }
@@ -34,7 +35,7 @@ function fixture() {
       ${settingsMethod},
       readOnly(units) { mode = 'prep'; lastPrep = { units }; setPrep(); }
     };`);
-  const api = factory(renderInfo, ctx, settings, infos, views, (id) => { dropped.push(id); views.delete(id); }, UnitView);
+  const api = factory(renderInfo, ctx, settings, infos, views, (id) => { dropped.push(id); views.delete(id); }, UnitView, tokenSkinOwner, assets);
   return { api, infos, views, dropped };
 }
 const unit = (id, ownerId = 'p_1', skin = SKIN) => ({ id, uid: id, kind: 'op', side: 'ally', ownerId, skin, spine: OP });
@@ -84,4 +85,19 @@ test('boss partner views refresh immediately when the setting or local identity 
   assert.equal(views.get('m:1').info.skin, null);
   api.setSettings({ otherSkins: true });
   assert.equal(views.get('m:1').info.skin, SKIN);
+});
+
+
+test('summon models follow the owner selection, visibility and selection clearing', () => {
+  const TOKEN = 'token_100_inside';
+  const { api, infos } = fixture({ manifest: { chars: { [OP]: { skins: { [SKIN]: { tokens: { [TOKEN]: { spine: {} } } } } } } } });
+  api.setSkins([{ playerId: 'p_1', skins: { [OP]: SKIN } }]);
+  api.applyInfo({ ...unit(10), kind: 'token', spine: TOKEN });
+  assert.equal(infos.get(10).skin, SKIN);
+  api.setSettings({ otherSkins: false });
+  assert.equal(infos.get(10).skin, null);
+  api.setSettings({ otherSkins: true });
+  assert.equal(infos.get(10).skin, SKIN);
+  api.setSkins([{ playerId: 'p_1', skins: {} }]);
+  assert.equal(infos.get(10).skin, null);
 });

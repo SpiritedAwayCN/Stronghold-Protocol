@@ -10,6 +10,8 @@ skins so the other-player switch restores loaded units when re-enabled, includin
 without restarting playback or changing the sim / BattleSpec. Resolve every surface's skin from the effective
 operator body (official `activity_table` `charShopChessDatas.backupCharId` for stand-ins, the pick for DIY slots).
 Outfits following that body and live refresh timing are cosmetic UI assumptions; gameplay and golden results stay unchanged.
+Summon models follow their owner's selected outfit and `otherSkins`; missing mappings retain default models.
+Summons retain their own VFX mounting points.
 
 **Studio test console (0.3.1).**
 

@@ -1331,7 +1331,11 @@ export function chargeKeys(plan) {
  * AuraHitBehaviour — for the area's life), the strikes their hit effects.
  */
 const binding = (o) => Object.freeze({ ...o, ...(o.cover ? { cover: Object.freeze(o.cover) } : {}), ...(o.keys ? { keys: Object.freeze(o.keys) } : {}) });
+const SOW_TILES = Object.freeze([[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]);
 export const FX_BINDINGS = Object.freeze({
+  skchr_swire2_2: Object.freeze({ summon: binding({ owner: 'src', keys: ['swire2_skill_02_start'], at: 'target', skin: true }) }),
+  skchr_shu_3: Object.freeze({ healField: binding({ owner: 'id', keys: ['shu_talent_buff_02'], at: 'point', tiles: SOW_TILES, hold: 'owner', decal: true, skin: true }) }),
+
   // Existing kit event supplies the elimination position (no invented projectile collision or ally trigger).
   skchr_yu_3: Object.freeze({ firewallBlock: binding({ owner: 'id', at: 'point', oneshot: true, keys: ['yu_skill3_annex_01'] }) }),
   // 克莱门莎 S3 (op-clemnt.js bombard): the kit marks an enemy's tile ('lock': id = the enemy, src = her) and strikes it

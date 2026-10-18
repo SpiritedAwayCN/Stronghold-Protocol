@@ -238,7 +238,9 @@ export function spineEntry(m, id, opts) {
   const tk = get(get(m, 'tokens'), s);
   if (tk) {
     const web = validSpine(tk.spine) ? tk.spine : null;
-    return (opts && opts.local && localSpineEntry(tk.spineLocal, opts.local, web)) || web;
+    const own = (opts && opts.local && localSpineEntry(tk.spineLocal, opts.local, web)) || web;
+    const skinned = tokenSkinSpine(m, s, opts && opts.skin);
+    return skinned ? { ...skinned, fallback: own } : own;
   }
   const en = get(get(m, 'enemies'), s);
   if (en) {
@@ -252,6 +254,25 @@ export function spineEntry(m, id, opts) {
     return (opts && opts.local && localSpineEntry(en.spineLocal, opts.local, web)) || web;
   }
   return null;
+}
+
+/** The base owner, or the owner explicitly supplying this summon in a cosmetic outfit. */
+export function tokenSkinOwner(m, tokenId, skinId) {
+  const base = get(get(get(m, 'tokens'), tokenId), 'owner');
+  if (base) return base;
+  for (const [id, rec] of Object.entries(m?.chars || {})) {
+    const skins = skinId ? [rec.skins?.[skinId]] : Object.values(rec.skins || {});
+    if (skins.some((skin) => get(get(skin, 'tokens'), tokenId))) return id;
+  }
+  return null;
+}
+
+/** Resolve the summon model supplied by its owner's selected cosmetic outfit. */
+export function tokenSkinSpine(m, tokenId, skinId) {
+  const owner = tokenSkinOwner(m, tokenId, skinId);
+  const skin = owner && skinId ? get(get(get(get(m, 'chars'), owner), 'skins'), skinId) : null;
+  const mapped = get(get(skin, 'tokens'), tokenId);
+  return validSpine(mapped?.spine) ? mapped.spine : null;
 }
 
 const localSpines = new WeakMap(); // spineLocal record → { local, web, entry } (one entry object per manifest pair)

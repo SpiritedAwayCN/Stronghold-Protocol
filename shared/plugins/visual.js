@@ -149,7 +149,8 @@ const TEXT_MAX = 64;
 const SKINS_MAX = 64;
 /** One skin of an operator: the pictures and models the operator's own record has, under its key, and its name. */
 const SKIN_RECORD = { fields: { name: 'text', group: 'text', avatar: 'image', avatarE2: 'image', portrait: 'image',
-  portraitE2: 'image', illust: 'image', spine: { fields: { front: 'spine', back: 'spine' } } } };
+  portraitE2: 'image', illust: 'image', spine: { fields: { front: 'spine', back: 'spine' } },
+  tokens: { each: { fields: { tokenSkinId: 'text', spine: 'spine' } }, key: /^[A-Za-z0-9_][A-Za-z0-9_./-]{0,127}$/ } } };
 const SFX_UNIT = { fields: { attack: 'audio', hit: 'audio', skill: 'audio', die: 'audio', born: 'audio',
   skills: { each: 'audio', key: INDEX }, attacks: { each: 'audio', key: INDEX }, hits: { each: 'audio', key: INDEX } } };
 

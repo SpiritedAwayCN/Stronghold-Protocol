@@ -347,6 +347,11 @@ installation's own skin id where its manifest has one (e.g. `char_003_kalts@boc#
 whatever wears a skin and the plugin have to agree on that key. A skin is a record of the same kinds the
 operator's own record has — `avatar`, `avatarE2`, `portrait`, `portraitE2`, `illust` and `spine.front` / `spine.back` —,
 plus `name` (1–64 characters: the skin's own name) and `group` (0–64 characters: its series), as that file writes them.
+A skin may also carry `tokens[tokenId] = { tokenSkinId?, spine }`: `tokenId` is an asset entry key, `tokenSkinId` is
+optional descriptive text (1–64 characters), and `spine` is one ordinary checked Spine record, packed into the lock
+like the operator's model. This is an outfit-local model mapping from the official `skin_table.json` tokenSkinMap,
+not a replacement for the token's base entry or a gameplay change. The owner’s existing skin selection chooses it;
+missing mappings/models retain the default token model (docs/SKINS.md).
 An empty `group` is allowed because an entry a plugin adds may have no series — each of the 1388 operator skins of the
 official `.cache/gamedata/excel/skin_table.json` carries a non-empty `displaySkin.skinGroupName` —, so this is
 room for a plugin's own new entry, not the state of the manifest.
@@ -526,7 +531,10 @@ of the official game in a plugin.
 An operator record can borrow official effects independently of its model:
 `"fx": { "unit": "char_112_siege", "skills": { "0": "skchr_siege_3" } }`.
 `unit` must be an exact extracted index unit key (no suffix stripping); `skills` maps our zero-based slot or exact skill id to an official skill id.
-The slot wins [ASSUMED]. Explicit unit/skill mappings precede the existing fallback chain. Attacks, projectiles,
+The slot wins [ASSUMED]. In this deployment, `roster-clemnt` declares `fx.unit: "char_4231_clemnt"` and maps
+slots 0–2 to `skchr_clemnt_1`–`skchr_clemnt_3`, including S2 风暴潮; the mapping is compiled onto both chess forms.
+It requires the extracted local FX bundle and the 3D board's 官方特效 setting.
+Explicit unit/skill mappings precede the existing fallback chain. Attacks, projectiles,
 hits and skill start/loop/end use the existing official renderer (3D); no gameplay is inherited.
 [ASSUMED] Borrowed talent visuals select only the borrower’s equipped talent indices, plus the trait; module
 visuals still require that active module. A missing exact unit disables its entire skills map, including skills

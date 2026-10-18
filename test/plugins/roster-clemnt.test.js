@@ -1,11 +1,13 @@
-import { test } from 'node:test';
+import { test as nodeTest } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fixture } from '../helpers/contentFixtures.js';
 import { buildContentSet } from '../../server/plugins/contentSet.js';
 import { makeMatch } from '../match/harness.js';
+import { resolveSkill, planFor } from '../../public/js/render/vfx/skills.js';
 
 const root = new URL('../../plugins/roster-clemnt/', import.meta.url);
+const test = (name, run) => nodeTest(name, { skip: !fs.existsSync(new URL('plugin.json', root)) }, run);
 const read = file => JSON.parse(fs.readFileSync(new URL(file, root), 'utf8'));
 
 function compose(t) {
@@ -27,6 +29,27 @@ test('roster-clemnt composes both trait forms without the old skill-start garris
     assert.equal(tr.spec.talents[0].when, 'elementBurst');
     assert.deepEqual(tr.spec.talents[0].do[0].layers, { bond: 'selfActive', amount, maxPerBattle });
     assert.equal(piece.garrisonIds.includes(`garrison_x_roster_clemnt_${form}`), false);
+  }
+});
+
+test('roster-clemnt binds official effects for both forms and resolves the S2 loop', t => {
+  const { data } = compose(t);
+  const unit = 'char_4231_clemnt', skillId = 'skchr_clemnt_2';
+  const skill = { rootClass: 'CastSkill', mode: 1, effects: ['clemnt_skill_02_buff_01'], uses: [{
+    role: 'loop', keys: ['clemnt_skill_02_buff_01'], from: 'ActiveBuffAbility._buffs', on: 'owner',
+    buff: 'clemnt_s2[switch_mode]', life: { type: 'LIMITED', key: 'duration' },
+  }] };
+  const idx = { version: 3, units: { [unit]: { skills: { [skillId]: skill } } }, skills: { [skillId]: skill },
+    prefabs: { clemnt_skill_02_buff_01: { looping: true } } };
+  for (const form of ['a', 'b']) {
+    const rec = data.chess[`chess_x_roster_clemnt_clemnt_${form}`];
+    assert.deepEqual(rec.fx, { unit, skills: { '0': 'skchr_clemnt_1', '1': skillId, '2': 'skchr_clemnt_3' } });
+    const info = { kind: 'op', skillIndex: 1, spine: rec.charId };
+    const resolved = resolveSkill(idx, { info, rec });
+    assert.equal(resolved.unitKey, unit);
+    assert.equal(resolved.skillId, skillId);
+    assert.equal(resolved.via, 'plugin');
+    assert.ok(planFor(idx, { info, rec }).plan.loop.some(e => e.key === 'clemnt_skill_02_buff_01'));
   }
 });
 

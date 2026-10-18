@@ -791,8 +791,20 @@ a sound — the runtime's audio may play it), and the long tail (55 classes in t
 ```
 { format: 'fx-index', version: 3, set: 'sample' | 'used' | 'keys', source: { root, client },
   units: { id: Unit }, projectiles: { key: Projectile }, skills: { skillId: Skill },
-  skins: { id: Skin }, generic: { hit, die, birth, status, keys }, prefabs: { key: PrefabSummary } }
+  skins: { id: Skin }, skinFx?: { exactSkinId: SkinHook },
+  generic: { hit, die, birth, status, keys }, prefabs: { key: PrefabSummary } }
 ```
+
+**Skin hook.** `skinFx` is additive to version 3. `tools/local-extract/fx.py skin_hooks` reads each operator's
+`skinpack/<charId>.ab` (hot-update overlay first), its `CharacterSkinHooker._replaceEffectPairs` and
+`_fakeProjectileConfigs`, and its own mount points. Each `SkinHook` has `source`, optional `replace` (lower-case
+`fromEffect → toEffect` keys), `fakeProjectiles` (the client's primitive config fields without leading underscores),
+`points` and `graphic` in the base Skin shape. Cached official skin tables or the bundled authoring catalogue preserve
+exact skin ID casing. Both sides of every replacement are included in the used-prefab export; projectile config
+strings are not mistaken for effect prefabs. Fake-projectile configs are preserved as extraction metadata, not a new
+projectile simulation rule. No worn skin, missing hooks, or an unavailable replacement retains the base effect.
+`FxWiring` resolves replacements from the source outfit (including target hits), preloads those variants and uses its
+mount points; a summon keeps its own mount points, even when its model follows an operator's outfit.
 
 `version` is 2 since Phase 1c and 3 since Phase 1d (the changelog lists what each added; an older reader finds every
 field it reads where it was). **Unit** (`char_*` from charpack/, `enemy_*` from battle/enm_pfb_*, tokens from
@@ -1197,6 +1209,15 @@ abilities (stand switches, revives) and a few modes' general abilities (funnels,
 exports them (§33.17: 42 of the 47; the other 5 are attacks no mode references).
 
 ### 33.16 The runtime's skill wiring (0.3.0 Phase 3b, 3c, 3d)
+
+**Outfit-aware tile/owner bindings.** Bindings may use `skin: true` to resolve their effect keys through the caster's
+SkinHook, `tiles: [[dx,dy], …]` to place one effect per tile (each with the tile's actual ground height), `hold: 'owner'`
+to retain/release it with that deployment, and `decal: true` to keep persistent ground art out of the transient
+one-shot eviction budget. Official plugin VFX budgets remain enforced. 黍 S3's `healField` uses the center and four
+cardinal sowing tiles with `shu_talent_buff_02`; 琳琅诗怀雅 S2's `summon` uses `swire2_skill_02_start` at the summon
+point. Missing outfit variants retain their base keys. [ASSUMED] An otherwise unbound talent/telent-named looping
+prefab attached to its holder may supply an owner-lifetime passive fallback; camera/tile spawns and already-bound
+rows are excluded, and the normal current skill-resolution logic remains authoritative.
 
 The field view plays a skill's effects from its `uses` (`render/vfx/skills.js skillPlan`: each use placed by its
 role, its ability, its events and its carrier — the module header; `render/vfx/skillfx.js` plays the plan, DESIGN §9

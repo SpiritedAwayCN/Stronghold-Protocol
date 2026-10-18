@@ -24,7 +24,7 @@
 
 import { createStore, loadPref, savePref } from '../store.js';
 import { data } from '../data.js';
-import { SKIN_LIMITS } from '../../../shared/protocol.js';
+import { isCharId, isSkinId, SKIN_LIMITS } from '../../../shared/protocol.js';
 
 /** The localStorage preference (`sp.pref.<key>`) of this browser's skin choices: `{ [charId]: skinId }`. */
 export const SKINS_PREF = 'skins';
@@ -64,7 +64,7 @@ export function parseStoredSkins(raw) {
   let kept = 0;
   for (const [charId, skinId] of Object.entries(raw)) {
     if (kept >= SKIN_LIMITS.entries) break;
-    if (!str(charId) || !str(skinId)) continue;
+    if (!isCharId(charId) || !isSkinId(skinId)) continue;
     out[charId] = skinId;
     kept++;
   }

@@ -36,11 +36,15 @@ export function chessAvatarUrl(m, chess) {
  * Half-body portrait (180×360) for a chess record (golden → E2 portrait when present).
  * @param {any} m
  * @param {any} chess
+ * @param {string|null} [skinId] selected appearance of the effective operator
  */
-export function chessPortraitUrl(m, chess) {
+export function chessPortraitUrl(m, chess, skinId = null) {
   const chars = obj(obj(m)?.chars);
   const id = str(chess?.assets?.portrait);
   if (!chars) return null;
+  const skin = skinId ? chars[chess?.charId]?.skins?.[skinId] : null;
+  const art = str(chess?.isGolden && skin?.portraitE2) || str(skin?.portrait) || str(skin?.illust);
+  if (art) return art;
   if (id) {
     // A golden piece whose portrait id is the character key uses portraitE2 when the entry has one.
     // An entry with only `portrait` (a custom golden URL included) keeps that URL. Official ids are

@@ -137,6 +137,7 @@
 // The helpers live in public/js/render/app/*.js and are re-exported below, so existing imports keep
 // working. createFieldView stays here: it is one closure over the view's own state.
 
+import { tokenSkinOwner } from '../assets.js';
 import { GEO, ANIM } from '../../../shared/constants.js';
 import { fxForm } from '../../../shared/protocol.js';
 import { Camera, presetCamera, lerpCamera, easeInOutCubic, pickTile, normRect } from './projection.js';
@@ -1553,8 +1554,9 @@ export async function createFieldView(host, options = {}) {
     // Keep the received choice intact across settings changes. A running battle's metadata may predate room.skins;
     // [ASSUMED] the latest public choice wins for operator bodies (including stand-ins / DIY), purely in this view.
     let skin = info.sourceSkin === undefined ? info.skin : info.sourceSkin;
-    if (info.kind === 'op' && playerSkins.has(info.ownerId)) {
-      skin = playerSkins.get(info.ownerId)[info.diy?.charId || info.spine] || null;
+    const tokenOwner = info.kind === 'token' ? tokenSkinOwner(assets.manifest, info.spine || info.defId) : null;
+    if ((info.kind === 'op' || tokenOwner) && playerSkins.has(info.ownerId)) {
+      skin = playerSkins.get(info.ownerId)[tokenOwner || info.diy?.charId || info.spine] || null;
     }
     if (!skin) return null;
     if (info.ownerId == null || !myId || info.ownerId === myId) return skin;

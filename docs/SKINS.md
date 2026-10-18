@@ -5,12 +5,11 @@ document is the normative reference for that feature; the art itself is **never*
 it comes from a **cosmetic plugin's overlay** (docs/PLUGINS.md §9), which the server's owner installs in `plugins/` and
 each player switches on for themself.
 
-> 上游 #652 被关闭的原因写在这里，因为它是这个设计的出发点：**服务器不提供安装通道**。当时的 `room.skin.install`
-> 让任何已连接的客户端都能让服务器去网上下载文件并改写所有客户端共读的 `data/assets.json`，而随包发布的
-> `data/skins-installed.json` 又会让更新校验对不上。本实现没有安装报文、不写 `data/` 下的任何文件、不随包发布任何
-> 安装状态：皮肤属于插件，插件怎么落地是 `plugins/` 目录（安装、studio、ZIP）本来就有的问题。
+> **服务器不提供安装通道。** 皮肤属于 cosmetic 插件，不随包发布安装状态，也不改写 `data/`。
+> 旧提交 `20a73e3e` 的 `tools/skins.mjs` 是维护者手动运行的 CLI，没有 `room.skin.install` 报文。
+> 下述迁移保留它的离线目录、手动获取与修复能力，但将输出改为插件；不新增房间安装接口或皮肤同步运行时。
 
-## The data: one overlay, no catalogue file
+## The runtime data: one overlay, no runtime catalogue file
 
 ```
 plugins/<id>/plugin.json
@@ -55,9 +54,22 @@ Three properties are load-bearing:
 | The server's owner | Drops the plugin folder into `plugins/` (the studio, a ZIP, or by hand), and switches it on for the **room** if they want a set everyone in that room sees | `plugins/`, a room's `vs` |
 | A player | Switches a `scope: ["personal"]` cosmetic plugin on for **themself** — a skin of their own choosing | `sp.pref.cosmetics` (this browser only, never sent) |
 
-A room's **host is not part of it**: an appearance a player wears comes from *their* browser's layers, so a plugin with
-`scope: ["personal"]` never appears in the room's 插件 panel and no room setting can force a skin on anyone. Two players
-of the same co-op match may therefore see different models for the same piece — see the switch below.
+Room and personal switches are independent. A plugin enabled for the room already supplies its skins to everyone in
+that room, even when its personal switch in 设置 → 外观插件 is off. The personal switch adds a layer above the room's
+art; it does not report whether the room enabled that plugin. A plugin with only `scope: ["personal"]` never appears
+in the room's 插件 panel. Two players may therefore see different models for the same piece — see the switch below.
+
+This deployment defaults the personal selection to `local-skins` and `local-skins-2` when no browser preference exists.
+Missing packs are ignored by catalogue resolution. Saved choices, including an empty list, take precedence, so disabling
+them stays disabled after reload. This loads the skin catalogue; individual operators still wear their selected outfit
+(or 默认 if none was selected). It does not change the room's gameplay plugins.
+
+For SilverAsh's `char_172_svrash@summer#4` S3, cast prefabs share the attack Spine track's playback rate and seek offset.
+The extracted `OnAttack` timestamp (0.433 seconds in `Skill`) and prefab emitter start/end events remain unchanged.
+[ASSUMED] Sharing the attack clock is a renderer policy; the data provides events, not this remake's scheduling code.
+Other outfits retain their existing playback. To revert only this policy, remove the summer-S3 `attackClock` handling
+in `public/js/render/vfx/wiring.js` and its regression test in `test/render/vfx-skins.test.js`; no art regeneration or
+simulation/golden changes are required.
 
 ## 设置「显示其他玩家的皮肤」 (default on)
 
@@ -80,6 +92,12 @@ view, which also refreshes existing prep scouts and the boss partner. `fieldHost
 (an omitted `skins` map clears it), even if later spawn metadata carries an older choice. This rebuilds appearance
 only: it neither changes the running sim / BattleSpec nor restarts playback. Live refresh timing is a remake UI
 choice, not a rule established by the official tables.
+
+## Shop portraits
+
+Shop and promotion-reward operator cards use this browser's selected skin for the effective operator, including
+stand-ins and DIY picks. Changing the selection refreshes existing cards. A golden card prefers the skin's
+`portraitE2`, then `portrait`, then `illust`; missing skin art falls back to the existing default portrait rules.
 
 ## The picker: two display rules
 
@@ -199,12 +217,60 @@ exists) gets no section rather than an empty grid.
   `@media (orientation: portrait) and (max-width: 1024px) { .sp-rotatable .rotate-hint { display: grid } }` for the
   `sp-rotatable` that `public/js/ui/device.js` sets on a coarse pointer whose screen is not landscape).
 
+## Manual local catalogue and migration
+
+`tools/skins.mjs` is an **opt-in authoring CLI**, never a server handler. The checked-in pure metadata catalogue is
+`docs/research/08-skins-catalogue.json`; `docs/research/08-skins.json` preserves the upstream URL research. `sync`
+scans a resource dump into ignored `.cache/skins-catalogue.json`. Runtime discovery still reads only the composed
+cosmetic overlay, not either catalogue. No command writes generated `data/*.json`.
+
+```powershell
+node tools/skins.mjs plan --offline --chars=char_003_kalts
+node tools/skins.mjs sync --offline --from=D:\LocalResources
+node tools/skins.mjs local --offline --from=D:\LocalResources
+node tools/skins.mjs inject --offline --output=plugins/local-skins
+node tools/skins.mjs verify --offline
+node tools/skins.mjs verify --offline --fix
+```
+
+The local tree has `spine/operator/battle/<skinId>/{front,back}/` and `operator/avatars/`; `portraits --source=local`
+can copy its `operator/arts/`. `fetch`, `layout`, and `portraits --source=net` are **manual network operations**;
+`--offline` refuses them (except a non-writing `--dry-run`). `sync --offline` uses cached official names only.
+`inject` always uses existing resources and cached official metadata, while the official packer derives animation
+roles, numbered skill clips, events and bounds. Missing pictures/models are omitted so the normal fallback remains.
+`normalize` repairs local atlas page names; `verify --fix` rebuilds the emitted lock, never the base manifest.
+
+For this migration, the actual changed skin records of `9c06c76f` can be imported without adopting its generated
+manifest or its other changes:
+
+```powershell
+node tools/skins.mjs inject --offline --import-commit=9c06c76f --output=plugins/local-skins
+node tools/skins.mjs verify --offline
+```
+
+`--import=<legacy-assets.json>` accepts an explicit metadata snapshot instead. Both imports copy only skin art
+already present under `public/assets/`; `--chars`, `--limit`, and `--no-spine` also apply. Unsafe dump filenames are
+renamed inside the plugin, preserving exact skin IDs as **keys**, and atlas page references follow the new names.
+Output is a self-contained cosmetic plugin (`plugin.json`, `skins.json`, `plugin.lock.json`, `art/`). Large sets split
+at operator boundaries into `local-skins-2`, etc., below the official per-plugin size limit; enable all emitted packs
+through the existing plugin manager. Re-emission replaces only this tool's own packs and removes obsolete numbered
+packs. Plugin folders, downloaded/copied art and caches stay ignored. No downloads are needed for the migration.
+
+### Summon outfits
+
+The cached official `skin_table.json` (`charSkins[skinId].tokenSkinMap`) maps an operator's outfit to token variants.
+When the corresponding local model exists, authoring emits `skins[skinId].tokens[tokenId] = { tokenSkinId, spine }`.
+These are ordinary checked Spine records (docs/PLUGINS.md §9). Existing public skin choices and `otherSkins` select
+both the operator and its summons; an absent mapping/model falls back to the token's default. No sim rule, wire
+message or second selection store is added. Summons do **not** borrow their operator's VFX mount points.
+
 ## Known limitations
 
 - **Bots always wear the default model** (`PlayerState.setSkins` refuses a bot, as `setLoadout` does).
 - **The studio does not list skins.** It finds an operator, an enemy or an interface picture by its official name
   (`server/studio/targets.js`), so a skin key is copied from the installation's manifest or written in the stem form.
-- **No skin effects and no operator voices** (a separate piece of work; docs/ASSETS.md).
+- **No operator voices.** Skin VFX requires a local extraction containing `skinFx`; without it the base effects remain
+  (docs/design/vfx-format.md §33.12). Cosmetic skin plugins supply models and pictures, not executable effects.
 - **A 自选 slot's own record has `charId: null`**, so it wears its **pick's** operator's skin — the slot has no body of
   its own. The picker offers the appearance while picking that operator, and the choice is kept per operator, so
   changing the slot's operator changes the appearance with it.
