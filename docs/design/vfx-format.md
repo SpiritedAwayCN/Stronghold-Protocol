@@ -274,6 +274,10 @@ plane — on screen that reads as falling down.
 **Time.** Effects run on the battle clock (`FxSystem._ts`, ≈ 2 game seconds per real second at 2× speed), so they stay
 in step with the Spine clips. The client simulates particles in steps of at most 1/30 s (TimeManager "Maximum Particle
 Timestep" 0.0333): a runtime that wants the same drag / limit-velocity results sub-steps the same way.
+The remake's late-start cast seek initializes the effect at zero, then advances the whole instance in steps of at
+most 1/30 s (capped at 1 s of seek). Clips, UV tweeners, particle systems and delayed node activations therefore
+advance together, rather than advancing particles while establishing the animation's time origin at the seek target.
+This is a shared effect seek policy, not a skin-specific forwarding of the attack Spine track's playback rate.
 
 ### 33.3 Value encodings (curves, gradients, references)
 

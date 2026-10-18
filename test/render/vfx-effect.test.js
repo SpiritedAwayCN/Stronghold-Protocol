@@ -144,6 +144,60 @@ test('an unowned looping effect ends after LOOP_TTL; an OnPlayEmitter loop is ow
   assert.ok(child.stopped, 'stopped with it');
 });
 
+describe('late-start effect clocks', () => {
+  for (const delay of [0, 0.1]) test(`seeking keeps clips, UVs and particles together (play delay ${delay})`, () => {
+    const rainbow = psNode(1, 0, { life: 1.2 });
+    rainbow.particleSystem.startDelay = 0.4;
+    const wave = { ...root(), id: 2, parent: 0, behaviours: [
+      { class: 'FxUVTweener', enabled: true, fields: { xspeed: 1, yspeed: 0, keepInitOffset: 0 } },
+    ] };
+    const delayed = { ...root(), id: 3, parent: 0, behaviours: [
+      { class: 'FxDelay', enabled: true, fields: { _delayTime: 0.2 } },
+    ], animator: { default: 1, enabled: true } };
+    const d = desc([root([pe({ _delayToPlay: delay })]), rainbow, wave, delayed,
+      psNode(4, 3, { life: 1 }), psNode(5, 0, { active: false, life: 1 })], {
+      clips: [
+        { name: 'wave', length: 1.5, curves: [
+          { node: 2, type: 'Transform', property: 'localScale.x', keys: [[0, 0, 1, 1], [1, 1, 1, 1]] },
+          { node: 2, type: 'MeshRenderer', property: 'material._TintColor.a', keys: [[0, 0, 1, 1], [1, 1, 1, 1]] },
+          { node: 5, type: 'GameObject', property: 'm_IsActive', keys: [[0, 0, null, null], [0.3, 1, null, null]] },
+        ] },
+        { name: 'delayed', length: 1, curves: [
+          { node: 3, type: 'Transform', property: 'localPosition.x', keys: [[0, 0, 1, 1], [1, 1, 1, 1]] },
+        ] },
+      ],
+    });
+    d.nodes[0].animator = { default: 0, enabled: true };
+    const def = compileEffect(d);
+    const lib = { available: true, has: () => true, def: () => def };
+    const ofx = new OfficialFx({ P: { Container: class {} }, renderer: null, cam: () => null, lib, tier: 'full' });
+    const snapshot = (fx) => ({
+      time: fx.time, loc: [...fx.loc], active: [...fx.hier], activatedAt: [...fx.actAt], materials: [...fx.matOv],
+      particles: fx.sys.map(s => s && { playing: s.playing, time: s.playing ? s.time : null, count: s.count, ages: [...s.age.slice(0, s.count)] }),
+    });
+    for (const skip of [0.2, 0.6, 0.73, 1.4]) {
+      const elapsed = Math.min(1, skip);
+      for (const pooled of [false, true]) {
+        const expected = new Effect(def, { seed: 123 });
+        expected.update(0);
+        const steps = Math.ceil(elapsed / (1 / 30));
+        for (let i = 0; i < steps; i++) expected.update(elapsed / steps);
+        if (pooled) {
+          const used = new Effect(def, { seed: 99 });
+          used.update(0);
+          runUntil(used, 0.8);
+          ofx._recycle(used);
+        }
+        const handle = ofx.spawn('test', { pos: [0, 0, 0] }, { skip, seed: 123 });
+        assert.deepEqual(snapshot(handle.effect), snapshot(expected), `skip ${skip}, pooled ${pooled}`);
+        expected.update(1 / 60);
+        handle.effect.update(1 / 60);
+        assert.deepEqual(snapshot(handle.effect), snapshot(expected), 'playback stays synchronized after seeking');
+      }
+    }
+  });
+});
+
 describe('placement and direction', () => {
   test('the anchor moves the root; mirror reflects x about the anchor', () => {
     const d = desc([root([pe({})]), { ...psNode(1, 0), pos: [0.5, 0, 0] }]);

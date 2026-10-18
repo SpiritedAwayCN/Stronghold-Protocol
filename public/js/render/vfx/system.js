@@ -23,6 +23,7 @@
 import { FxLibrary } from './library.js';
 import { FxGL } from './gl.js';
 import { Effect } from './effect.js';
+import { MAX_STEP } from './psys.js';
 import { FrameData, cameraBasis } from './geom.js';
 import { mat4, mat4Mul } from './math.js';
 
@@ -477,8 +478,12 @@ export class FxHandle {
       for (const k of def.onFinish) if (k !== def.key) s.spawn(k, { pos: f.anchor.slice(), yaw: f.yaw, mirror: f.mirror, groundZ: f.groundZ }, { track: this.opts.track, owner: this.opts.owner });
     };
     this.effect = fx;
-    // started late (a cast whose wind-up began past the clip's start): advanced to where it would be
-    if (this.opts.skip > 0) fx.update(Math.min(1, this.opts.skip));
+    // Establish activation times before seeking; step clips and particles together through delayed activations.
+    if (this.opts.skip > 0) {
+      fx.update(0);
+      const skip = Math.min(1, this.opts.skip), steps = Math.ceil(skip / MAX_STEP);
+      for (let i = 0; i < steps; i++) fx.update(skip / steps);
+    }
     if (this.stopped) fx.stop(this.stopped);
     s._add(fx);
     return fx;

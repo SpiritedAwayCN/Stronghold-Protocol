@@ -64,12 +64,18 @@ Missing packs are ignored by catalogue resolution. Saved choices, including an e
 them stays disabled after reload. This loads the skin catalogue; individual operators still wear their selected outfit
 (or 默认 if none was selected). It does not change the room's gameplay plugins.
 
-For SilverAsh's `char_172_svrash@summer#4` S3, cast prefabs share the attack Spine track's playback rate and seek offset.
-The extracted `OnAttack` timestamp (0.433 seconds in `Skill`) and prefab emitter start/end events remain unchanged.
-[ASSUMED] Sharing the attack clock is a renderer policy; the data provides events, not this remake's scheduling code.
-Other outfits retain their existing playback. To revert only this policy, remove the summer-S3 `attackClock` handling
-in `public/js/render/vfx/wiring.js` and its regression test in `test/render/vfx-skins.test.js`; no art regeneration or
-simulation/golden changes are required.
+For SilverAsh's `char_172_svrash@summer#4` S3, the effects index replaces the base cast prefabs with the summer
+outfit's `svrash_skill_03_start_01_summer#4` and `svrash_skill_03_start_02_summer#4`; both start at `ON_CAST_START`.
+The latter contains both the rainbow particle (`caihong`, start delay 0.4 s) and animated water ripples (`shuiwen`,
+alpha starts rising at about 0.333 s). These authored offsets and the model's `Skill` `OnAttack` at 0.433 s are retained.
+The renderer passes the attack wind-up's seek offset to the effects; there is no summer-S3 `attackClock` override
+or per-attack Spine playback-rate forwarding. Effects use the battle clock and their authored simulation speeds.
+
+Late-start casts of every outfit use the same seek path in `public/js/render/vfx/system.js`: initialize at zero,
+then advance clips, UV tweeners and particles together in steps of at most 1/30 s, retaining the existing 1 s seek cap.
+This prevents a particle system from consuming the seek offset while the animation starts from zero, and processes
+delayed activations along the way. Regression tests: `test/render/vfx-effect.test.js`. No art regeneration,
+simulation or golden changes are required.
 
 For Skadi's `char_263_skadi@summer#3` (驭浪 WR04), `SpineActor` disables cross-clip mixing for
 `char_263_skadi_summer_3` on both sides. The local skeleton's attachment switches change coordinate frames:
